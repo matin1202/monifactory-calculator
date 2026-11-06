@@ -14,7 +14,7 @@ describe('Repository', () => {
     it('should find items by id', () => {
         const item = Repository.current.GetById<Item>('i:gtceu:electric_blast_furnace:0');
         expect(item).toBeDefined();
-        expect(item?.name).toBe('Electric Blast Furnace [EBF]');
+        expect(item?.name).toBe('Electric Blast Furnace');
     });
 
     it('should find fluids by id', () => {

@@ -1,7 +1,7 @@
 import { RecipeModel, OverclockResult } from "./page.js";
 import { Fluid, Goods, Item, Recipe, RecipeInOut, RecipeIoType, RecipeType, Repository } from "./repository.js";
 import { TIER_LV, TIER_MV, TIER_HV, TIER_EV, TIER_IV, TIER_LUV, TIER_ZPM, TIER_UV, TIER_UHV, TIER_UEV, TIER_UIV, TIER_UXV, CoilTierNames, CoilTiers } from "./utils.js";
-import { voltageTier, getFusionTierByStartupCost, formatTicksAsTime, RotorHolderTiers, TurbineRotors, ReflectorTiers, ParallelHatchTier, ParallelHatchTiers, AbsoluteParallelHatchTiers, HeatingFluids } from "./utils.js";
+import { voltageTier, getFusionTierByStartupCost, formatTicksAsTime, RotorHolderTiers, TurbineRotors, ParallelHatchTier, ParallelHatchTiers, AbsoluteParallelHatchTiers } from "./utils.js";
 
 export type MachineCoefficient<T> = Exclude<T, Function> | ((recipe:RecipeModel, choices:{[key:string]:number}) => T);
 
@@ -224,7 +224,7 @@ export const notImplementedMachine:Machine = {
 // ----------------------------------------------------------------------------
 // Machine behaviour is derived from the crafter's exported recipeModifiers
 // rather than a hardcoded per-machine table. The formulas mirror
-// GTRecipeModifiers / StarTRecipeModifiers from the StarTech source. Crafters
+// GTRecipeModifiers from the GregTech CEu source. Crafters
 // whose modifiers are not modelled fall back to a sensible default (non-perfect
 // overclock, no parallels) and carry an informational note.
 // ============================================================================
@@ -278,54 +278,12 @@ export function getChoiceDefaultDescriptors():ChoiceDescriptor[] {
         { key: "parallels", description: "Parallel Hatch", options: ParallelHatchTiers.map((tier) => `${tier.name}: ${tier.parallels}`) },
         { key: "absoluteParallels", description: "Absolute Parallel Hatch", options: AbsoluteParallelHatchTiers.map((tier) => `${tier.name}: ${tier.parallels}`) },
         { key: "bulking", description: "Bulking", options: BULKING_TYPES.map((type, i) => `Type ${i}: ${type.parallels}x / ${type.durationMultiplier}x`) },
-        { key: "reflector", description: "Reflector", options: ReflectorTiers.map((reflector) => `T${reflector.tier}: ${reflector.name}`) },
-        { key: "heatingFluid", description: "Heating Fluid", options: HeatingFluids.map((fluid) => `${fluid.name}: ${fluid.temperature}MK`) },
         { key: "rotorHolder", description: "Rotor Holder", options: RotorHolderTiers.map((holder) => holder.name) },
         { key: "turbineRotor", description: "Rotor", options: TurbineRotors.map((rotor) => `${rotor.name} (P:${rotor.power}%, E:${rotor.efficiency}%)`) },
         { key: "boosting", description: "Turbine Boosting", options: ["None", "Passive", "Active"] },
         { key: "combustionBoosting", description: "Combustion Boosting", options: ["None", "Boosting"] },
         { key: "cooling", description: "Combustion Frame Cooling", options: CombustionFrameCooling.map((c) => c.label) },
-        { key: "solarCooling", description: "Solar Array Cooling", options: ["Off", "On"] },
     ];
-}
-
-// --- Hell Forge heating fluids ---
-// The Hell Forge heats its crucible with a heating fluid. The recipe's required
-// temperature (ebf_temp, in MK) determines the minimum usable fluid; every 450MK
-// the fluid's temperature exceeds it multiplies the free (absolute) parallels by 2.
-function makeHeatingFluidChoice():Choice {
-    return {
-        description: "Heating Fluid",
-        choices: HeatingFluids.map((fluid) => `${fluid.name}: ${fluid.temperature}MK`),
-        minIndex: minHeatingFluidIndex,
-    };
-}
-
-function hellforgeRequiredTemp(recipe:RecipeModel):number {
-    return recipe.recipe?.gtRecipe.MetadataByKey("ebf_temp") ?? 0;
-}
-
-// Lowest heating-fluid index whose temperature reaches the recipe's required
-// temperature. Fluids below it cannot heat the crucible enough to run the recipe
-// and are hidden from the dropdown.
-function minHeatingFluidIndex(recipe:RecipeModel):number {
-    const required = hellforgeRequiredTemp(recipe);
-    if (required <= 0)
-        return 0;
-    const index = HeatingFluids.findIndex((fluid) => fluid.temperature >= required);
-    return index < 0 ? Math.max(0, HeatingFluids.length - 1) : index;
-}
-
-// For every full 450MK the selected fluid exceeds the recipe's required
-// temperature, the free parallels multiply by 2 (e.g. +450MK => x2, +1350MK => x8).
-function hellforgeParallels(recipe:RecipeModel, choices:{[key:string]:number}):number {
-    const fluid = HeatingFluids[choices.heatingFluid] ?? HeatingFluids[0];
-    if (!fluid)
-        return 1;
-    const excess = fluid.temperature - hellforgeRequiredTemp(recipe);
-    if (excess < 450)
-        return 1;
-    return Math.pow(2, Math.floor(excess / 450));
 }
 
 function makeCoilChoice():Choice {
@@ -333,19 +291,6 @@ function makeCoilChoice():Choice {
         description: "Coils",
         choices: CoilTierNames.map((name, index) => `T${index+1}: ${name}`),
     };
-}
-
-function makeReflectorChoice():Choice {
-    return {
-        description: "Reflector",
-        choices: ReflectorTiers.map((reflector) => `T${reflector.tier}: ${reflector.name}`),
-    };
-}
-
-// Lowest reflector choice index whose tier satisfies the recipe requirement.
-function minReflectorIndexForTier(requiredTier:number):number {
-    const index = ReflectorTiers.findIndex((reflector) => reflector.tier >= requiredTier);
-    return index < 0 ? Math.max(0, ReflectorTiers.length - 1) : index;
 }
 
 // Fusion reactors run at a fixed voltage matching their tier (e.g. luv/zpm/uv/
@@ -453,29 +398,10 @@ function addFreeParallelChoice(builder:MachineBuilder) {
     builder.powerFactors.push((_recipe, choices) => 1 / parallelHatchCount(AbsoluteParallelHatchTiers, choices.absoluteParallels));
 }
 
-// Hell Forge heating-fluid modifier. The selected fluid sets the crucible
-// temperature; surplus heat over the recipe's required temperature grants free
-// (absolute) parallels that do not increase EU consumption. Applied by crafter id
-// (the underlying recipe-modifier lambda is shared and its id is unstable).
-function addHellforgeHeatingFluid(builder:MachineBuilder) {
-    builder.choices["heatingFluid"] = makeHeatingFluidChoice();
-    builder.parallelFactors.push((recipe, choices) => hellforgeParallels(recipe, choices));
-    builder.powerFactors.push((recipe, choices) => 1 / hellforgeParallels(recipe, choices));
-    builder.infos.push("Hell Forge: a heating fluid heats the crucible; every 450MK above the recipe's required temperature doubles the free parallels.");
-}
-
 // Crafters whose recipe-modifier lambda is not modelled by id but whose behaviour
 // is known. Keyed by `mod:internalName` (the lambda id is shared and unstable
 // across exports, so it cannot be used as a stable key).
 const crafterModifierRegistry: {[id:string]: ModifierImpl} = {
-    "start_core:hellforge": addHellforgeHeatingFluid,
-    "start_core:fornaxs_infernal_rotary_engine": addHellforgeHeatingFluid,
-    "start_core:bacterial_hydrocarbon_harvester": builder => {
-        builder.infos.push("Input/output amounts are for a perfect-stat (5/1/1) bacteria colony.");
-    },
-    "start_core:bacterial_breeding_vat": builder => {
-        builder.infos.push("Output assumes no mutation.");
-    },
 };
 
 // Maps each known modifier id to the contribution it makes to a machine.
@@ -483,6 +409,10 @@ const modifierRegistry: {[id:string]: ModifierImpl} = {
     // --- Overclocking behaviour ---
     "oc_perfect": builder => { builder.overclocker = StandardOverclocker.onlyPerfect(); },
     "oc_non_perfect": builder => { builder.overclocker = StandardOverclocker.onlyNormal(); },
+    "oc_perfect_subtick": builder => {
+        builder.overclocker = StandardOverclocker.onlyPerfect();
+        builder.subtick = true;
+    },
     "oc_non_perfect_subtick": builder => {
         builder.overclocker = StandardOverclocker.onlyNormal();
         builder.subtick = true;
@@ -578,57 +508,6 @@ const modifierRegistry: {[id:string]: ModifierImpl} = {
     "default_environment_requirement": NO_OP,
     "consume_eu_to_start": NO_OP,
     "fake_fusion_overclock": NO_OP,
-
-    // --- Reflector fusion reactor ---
-    // Mirrors ReflectorFusionReactorMachine.recipeModifier from StarT-Core. The
-    // reactor runs at a fixed voltage equal to its tier. Overclocking is done
-    // with half-perfect "Fusion OC" steps (2x speed, 2x EU/t, so energy per
-    // recipe is unchanged):
-    //   * one Fusion OC for each tier the reactor voltage is above the recipe
-    //     base tier, then
-    //   * one extra Fusion OC for each surplus reflector tier (reflectorDiff),
-    //     applied afterwards up to the reactor tier's maximum voltage.
-    // A reactor can only run a recipe whose startup energy (eu_to_start) fits
-    // within its maximum energy storage (read from the tooltip).
-    "reflector_fusion_reactor": (builder, crafter) => {
-        builder.choices["reflector"] = makeReflectorChoice();
-        // A reactor can only run a recipe whose reflector requirement is met:
-        // hide reflector tiers below the recipe's required `reflector_tier`.
-        builder.choices["reflector"].minIndex = (recipe) => {
-            const required = recipe.recipe?.gtRecipe.MetadataByKey("reflector_tier") ?? 0;
-            return required > 0 ? minReflectorIndexForTier(required) : 0;
-        };
-        const maxEnergyStorage = crafter.MetadataByKey("maxEnergyStorage", 0);
-        if (maxEnergyStorage > 0) {
-            builder.excludesRecipe = (recipe) => {
-                const euToStart = recipe.gtRecipe.MetadataByKey("eu_to_start", 0);
-                return euToStart > maxEnergyStorage;
-            };
-        }
-        const reactorTier = getReactorVoltageTier(crafter);
-        if (reactorTier !== undefined)
-            builder.fixedVoltageTier = reactorTier;
-        builder.overclocker = (recipe, choices) => {
-            const required = recipe.recipe?.gtRecipe.MetadataByKey("reflector_tier") ?? 0;
-            const reflector = ReflectorTiers[choices.reflector] ?? ReflectorTiers[0];
-            const reflectorDiff = Math.max(0, (reflector?.tier ?? 1) - required);
-            return new OverclockerFromClosure((recipeModel, _overclockTiers) => {
-                const gtRecipe = recipeModel.recipe?.gtRecipe;
-                // One Fusion OC per reactor tier above the recipe base tier.
-                const baseOverclocks = Math.max(0, recipeModel.voltageTier - (gtRecipe?.voltageTier ?? recipeModel.voltageTier));
-                // The reactor tier's max voltage caps how many extra (reflector)
-                // Fusion OCs can be applied: each OC doubles the EU/t draw.
-                const baseVoltage = Math.abs(gtRecipe?.voltage ?? 0);
-                const reactorMaxVoltage = voltageTier[recipeModel.voltageTier]?.voltage ?? 0;
-                const voltageOverclockCap = (baseVoltage > 0 && reactorMaxVoltage > 0)
-                    ? Math.floor(Math.log2(reactorMaxVoltage / baseVoltage))
-                    : baseOverclocks + reflectorDiff;
-                const totalOverclocks = Math.min(baseOverclocks + reflectorDiff, Math.max(baseOverclocks, voltageOverclockCap));
-                return StandardOverclocker.fusion().calculate(recipeModel, totalOverclocks);
-            });
-        };
-        builder.infos.push("Reflector fusion: runs at the reactor's fixed voltage; surplus reflector tiers add Fusion OCs up to the reactor tier's max voltage.");
-    },
 };
 
 const machineCache: {[id:string]: Machine} = {};
@@ -893,124 +772,14 @@ function makeCombustionMachine(spec:CombustionSpec):Machine {
     };
 }
 
-// ============================================================================
-// Solar panels & arrays (power generators)
-// ----------------------------------------------------------------------------
-// A solar panel/array holds a fixed number of solar cells (its parallel count,
-// read from gtceu:multiblock_info into the `solarCellCount` item metadata). Each
-// cell outputs its rated EU/t while exposed to the sun, but exposure heats the
-// cell (+0.2K, or +0.18K with array cooling, times the cell's heating modifier)
-// while idling cools it (-0.1K). Kept heat-neutral, a cell is productive only
-// s = 1/(1 + heatBuildup*hm/0.1) of the time, so the sustained output is scaled
-// by that duty cycle. The synthesized recipe carries the cell's productive
-// lifetime as its duration and the heating modifier as `solar_heating_modifier`;
-// `speed` = s stretches it to the real (heat-neutral) lifetime while `power`
-// applies the panel's voltage multiplier. Cooling (arrays only) both raises the
-// multiplier and, by lowering heat buildup, the duty cycle.
-// ============================================================================
-type SolarSpec = {
-    voltMult: number;           // base output multiplier (uncooled)
-    voltMultCooled?: number;    // output multiplier with De-Ionized Water cooling (arrays)
-    isArray: boolean;           // arrays support a cooling toggle
-};
-
-function makeSolarMachine(crafter:Item, spec:SolarSpec):Machine {
-    const cellCount = Math.max(1, crafter.MetadataByKey("solarCellCount", 1));
-
-    const isCooled = (selected:{[key:string]:number}) => spec.isArray && (selected.solarCooling ?? 0) === 1;
-
-    // Productive fraction of time when the array is kept heat-neutral.
-    const dutyCycle = (recipe:RecipeModel, selected:{[key:string]:number}) => {
-        const hm = recipe.recipe?.gtRecipe.MetadataByKey("solar_heating_modifier", 1) ?? 1;
-        const heatBuildup = isCooled(selected) ? 0.18 : 0.2;
-        return 1 / (1 + heatBuildup * hm / 0.1);
-    };
-
-    const speed:MachineCoefficient<number> = (recipe, selected) => dutyCycle(recipe, selected);
-
-    const power:MachineCoefficient<number> = (recipe, selected) => {
-        const voltMult = isCooled(selected) ? (spec.voltMultCooled ?? spec.voltMult) : spec.voltMult;
-        return voltMult * dutyCycle(recipe, selected);
-    };
-
-    const choices:{[key:string]:Choice} = {};
-    if (spec.isArray)
-        choices.solarCooling = { description: "De-Ionized Water Cooling", choices: ["Off", "On"] };
-
-    const info:MachineCoefficient<string> = (recipe, selected) =>
-        `Assumes sun exposure is regulated to keep the ${spec.isArray ? "array" : "panel"} heat-neutral, so the cells idle part of the time; ` +
-        `output is the sustained average (${(dutyCycle(recipe, selected) * 100).toFixed(1)}% duty cycle).`;
-
-    return {
-        choices,
-        overclocker: NullOverclocker.instance,
-        speed,
-        power,
-        parallels: cellCount,
-        ignoreParallelLimit: true,
-        info,
-    };
-}
-
-// ============================================================================
-// Parallel-only machines (parallel hatches, no overclocking)
-// ----------------------------------------------------------------------------
-// Some multiblocks (e.g. the Nuclear Reactor) support parallel hatches but do
-// not overclock at all. The modifier engine can't express this: a crafter that
-// only carries the `parallel_hatch` modifier falls back to the default normal
-// overclocker, which would wrongly overclock the recipe at higher voltage tiers.
-// This custom machine reproduces the parallel-hatch behaviour with overclocking
-// disabled.
-// ============================================================================
-function makeParallelOnlyMachine():Machine {
-    return {
-        choices: {
-            parallels: makeParallelHatchChoice(ParallelHatchTiers),
-        },
-        overclocker: NullOverclocker.instance,
-        speed: 1,
-        power: 1,
-        parallels: (_recipe, choices) => parallelHatchCount(ParallelHatchTiers, choices.parallels),
-        ignoreParallelLimit: true,
-    };
-}
-
-function makeCompoundGeneratorMachine(voltageTierIndex:number):Machine {
-    return {
-        overclocker: NullOverclocker.instance,
-        speed: 1,
-        power: 1,
-        parallels: (recipe) => 16 * generatorParallels(recipe),
-        fixedVoltageTier: voltageTierIndex,
-        ignoreParallelLimit: true,
-        info: "Generates 16A at its fixed voltage with 100% fuel efficiency.",
-    };
-}
-
 // Crafters whose machine cannot be derived from modifiers. Keyed by the binary
 // item id (i:<mod>:<internalName>:<damage>).
 const customMachineRegistry:{[crafterId:string]: (crafter:Item) => Machine} = {
-    // Nuclear Reactor: supports parallel hatches only, never overclocks.
-    "i:gtceu:nuclear_reactor:0": () => makeParallelOnlyMachine(),
-    "i:gtceu:lv_compound_generator:0": () => makeCompoundGeneratorMachine(TIER_LV),
-    "i:gtceu:mv_compound_generator:0": () => makeCompoundGeneratorMachine(TIER_MV),
-    "i:gtceu:hv_compound_generator:0": () => makeCompoundGeneratorMachine(TIER_HV),
     "i:gtceu:steam_large_turbine:0": () => makeTurbineMachine({ controllerTier: 3, baseProduction: 1024, parallelBonus: 1 }),
     "i:gtceu:gas_large_turbine:0": () => makeTurbineMachine({ controllerTier: 4, baseProduction: 4096, parallelBonus: 1 }),
     "i:gtceu:plasma_large_turbine:0": () => makeTurbineMachine({ controllerTier: 5, baseProduction: 16384, parallelBonus: 1 }),
-    "i:gtceu:supreme_plasma_turbine:0": () => makeTurbineMachine({ controllerTier: 5, baseProduction: 16384, parallelBonus: 6, boostTable: [0.9, 1.25, 2] }),
-    "i:gtceu:nyinsane_plasma_turbine:0": () => makeTurbineMachine({ controllerTier: 5, baseProduction: 16384, parallelBonus: 12, boostTable: [0.8, 1.5, 3] }),
-    "i:gtceu:large_combustion_engine:0": () => makeCombustionMachine({ voltageTier: TIER_EV, baseProduction: 2048, boostMultiplier: 3, boostFluid: "Oxygen" }),
+    "i:gtceu:large_combustion_engine:0": () => makeCombustionMachine({ voltageTier: TIER_EV, baseProduction: 2048, boostMultiplier: 3, boostFluid: "Oxygen Gas" }),
     "i:gtceu:extreme_combustion_engine:0": () => makeCombustionMachine({ voltageTier: TIER_IV, baseProduction: 8192, boostMultiplier: 4, boostFluid: "Liquid Oxygen" }),
-    "i:start_core:luv_combustion_module:0": () => makeCombustionMachine({ voltageTier: TIER_LUV, baseProduction: 32768, boostMultiplier: 5, boostFluid: "White Fuming Nitric Acid", modular: true }),
-    "i:start_core:zpm_combustion_module:0": () => makeCombustionMachine({ voltageTier: TIER_ZPM, baseProduction: 131072, boostMultiplier: 6, boostFluid: "Red Fuming Nitric Acid", modular: true }),
-    "i:start_core:uv_combustion_module:0": () => makeCombustionMachine({ voltageTier: TIER_UV, baseProduction: 1048576, boostMultiplier: 4, boostFluid: "Dioxygen Difluoride", modular: true }),
-    "i:start_core:uev_combustion_module:0": () => makeCombustionMachine({ voltageTier: TIER_UEV, baseProduction: 16777216, boostMultiplier: 6, boostFluid: "Ferrocenium Superoxide", modular: true }),
-    "i:start_core:ev_solar_panel:0": (crafter) => makeSolarMachine(crafter, { voltMult: 1.0, isArray: false }),
-    "i:start_core:iv_solar_panel:0": (crafter) => makeSolarMachine(crafter, { voltMult: 1.05, isArray: false }),
-    "i:start_core:luv_solar_panel:0": (crafter) => makeSolarMachine(crafter, { voltMult: 1.1, isArray: false }),
-    "i:start_core:uv_solar_array:0": (crafter) => makeSolarMachine(crafter, { voltMult: 1.2, voltMultCooled: 1.325, isArray: true }),
-    "i:start_core:uhv_solar_array:0": (crafter) => makeSolarMachine(crafter, { voltMult: 1.25, voltMultCooled: 1.45, isArray: true }),
 };
 
 // Builds (and memoizes) the Machine for a given multiblock crafter from its

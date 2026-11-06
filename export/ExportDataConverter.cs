@@ -42,10 +42,7 @@ namespace Source
         // Modifier metadata omitted by the exporter but required to model the machine.
         private static readonly Dictionary<string, string[]> HardcodedRecipeModifiers = new()
         {
-            ["gtceu:electric_blast_furnace"] = new[] { "subtick" },
-            ["gtceu:large_chemical_reactor"] = new[] { "subtick" },
-            ["gtceu:mega_blast_furnace"] = new[] { "subtick" },
-            ["gtceu:super_ebf"] = new[] { "subtick" },
+            ["gtceu:electric_blast_furnace"] = new[] { "subtick" }, // heatingCoilOC applies subtick parallels in GTCEu
         };
 
         // Vanilla furnace recipe types run in GT machines at a fixed energy cost,
@@ -63,10 +60,6 @@ namespace Source
         // passed so a transform can synthesize/look up resolved items (e.g. nbt-stripped variants).
         private static readonly Dictionary<string, Func<RecipeJson, Dictionary<string, Item>, List<RecipeJson>>> RecipeTransforms = new()
         {
-            ["gtceu:bacterial_hydrocarbon_harvester"] = TransformBacterialHydrocarbonHarvester,
-            ["gtceu:bacterial_breeding_vat"] = TransformBacterialBreedingVat,
-            ["gtceu:solar_panel_replacement"] = TransformSolarPanelReplacement,
-            ["gtceu:canner"] = TransformCanner,
         };
 
         #region JSON models
@@ -147,7 +140,6 @@ namespace Source
             var oreDictByTag = new Dictionary<string, OreDict>();
             var fluidOreDictByTag = new Dictionary<string, OreDict>();
             var missingRefs = new HashSet<string>();
-            var solarCellCounts = new Dictionary<string, int>();
 
             // --- Items ---
             foreach (var (key, entry) in ReadObject<GoodsEntryJson>(Path.Combine(dataPath, "items.json")))
@@ -269,8 +261,6 @@ namespace Source
             {
                 foreach (var rjRaw in JsonSerializer.Deserialize<List<RecipeJson>>(File.ReadAllText(file), StrictOptions))
                 {
-                    if (rjRaw.type == "gtceu:multiblock_info")
-                        CaptureSolarCellCount(rjRaw, solarCellCounts);
                     if (IgnoredRecipeTypes.Contains(rjRaw.type))
                         continue;
 
@@ -396,9 +386,6 @@ namespace Source
             if (unresolved.Count > 0)
                 throw new InvalidDataException($"Unresolved item/fluid references in recipes ({unresolved.Count}):\n" +
                     string.Join("\n", unresolved.Take(50)) + (unresolved.Count > 50 ? "\n..." : ""));
-
-            // --- Synthesized Solar Power generators ---
-            GenerateSolarPower(items, recipeTypes, recipes, solarCellCounts);
 
             // --- Icons: all fluids first, then touched items (iconId = index into icons list) ---
             foreach (var fluid in fluids.Values)
@@ -626,234 +613,11 @@ namespace Source
 
 
 
-        #region Solar Power generators
-
-        // Solar cells output EU while exposed to the sun and take 1 durability damage per
-        // productive cycle; after SolarCellDurability cycles the cell breaks. VoltageOut and the
-        // heating modifier are fixed game constants (shown on each cell's tooltip). The "Solar
-        // Power" recipe type is fully synthesized by the calculator, so they are listed here
-        // rather than parsed. Each cell's VoltageOut tier is one step below its name tier.
-        private static readonly (string id, int voltageOut, double heatingModifier, int durability)[] SolarCells =
-        {
-            ("start_core:ev_solar_cell",  512,    1.00, 2048),
-            ("start_core:iv_solar_cell",  2048,   0.95, 3072),
-            ("start_core:luv_solar_cell", 8192,   0.90, 4096),
-            ("start_core:zpm_solar_cell", 32768,  0.85, 6144),
-            ("start_core:uv_solar_cell",  131072, 0.80, 8192),
-            ("start_core:uhv_solar_cell", 524288, 0.75, 12288),
-        };
-
-        // The solar panel/array multiblocks that act as crafters for the Solar Power type.
-        private static readonly string[] SolarCrafters =
-        {
-            "start_core:ev_solar_panel",
-            "start_core:iv_solar_panel",
-            "start_core:luv_solar_panel",
-            "start_core:uv_solar_array",
-            "start_core:uhv_solar_array",
-        };
-
-        private const int SolarCycleTicks = 120;        // ticks per productive cycle (6 seconds)
-
-        // Records how many solar cells a solar panel/array structure contains, read from its
-        // gtceu:multiblock_info entry (which is otherwise excluded from the export). The count is
-        // used as the multiblock's fixed parallel count in machines.ts.
-        private static void CaptureSolarCellCount(RecipeJson recipe, Dictionary<string, int> solarCellCounts)
-        {
-            if (recipe.id == null || recipe.itemInputs == null)
-                return;
-            if (!recipe.id.EndsWith("_solar_panel") && !recipe.id.EndsWith("_solar_array"))
-                return;
-            foreach (var stack in recipe.itemInputs.Values)
-            {
-                if (stack.key != null && stack.key.EndsWith("_solar_cell"))
-                {
-                    solarCellCounts[recipe.id] = stack.count;
-                    return;
-                }
-            }
-        }
-
-        // Synthesizes the "Solar Power" recipe type: each solar panel/array is a generator that
-        // consumes one solar cell and outputs EU (negative voltage). A cell lasts its durability
-        // in productive cycles, so the recipe duration is that productive lifetime; machines.ts
-        // stretches it to the heat-neutral wall-clock time and scales the output by the panel's
-        // voltage multiplier and the number of cells (the parallel count).
-        private static void GenerateSolarPower(
-            Dictionary<string, Item> items,
-            List<RecipeType> recipeTypes,
-            List<Recipe> recipes,
-            Dictionary<string, int> solarCellCounts)
-        {
-            var type = new RecipeType
-            {
-                name = "Solar Power",
-                category = "start_core",
-                itemInputs = new RecipeDimensions(1, 1),
-                itemOutputs = new RecipeDimensions(1, 1),
-                fluidInputs = new RecipeDimensions(0, 0),
-                fluidOutputs = new RecipeDimensions(0, 0),
-                shapeless = false,
-            };
-
-            foreach (var crafterId in SolarCrafters)
-            {
-                if (!items.TryGetValue(crafterId, out var crafter))
-                    continue;
-                crafter.touched = true;
-                if (solarCellCounts.TryGetValue(crafterId, out var cellCount) && cellCount > 0)
-                    crafter.metadata.Add(new ItemMetadata { key = "solarCellCount", value = cellCount });
-                if (!type.crafters.Contains(crafter))
-                    type.crafters.Add(crafter);
-            }
-
-            if (type.crafters.Count == 0)
-                return;
-
-            recipeTypes.Add(type);
-
-            foreach (var (cellId, voltageOut, heatingModifier, durability) in SolarCells)
-            {
-                if (!items.TryGetValue(cellId, out var cell))
-                    continue;
-                var brokenCell = EnsureBrokenSolarCell(cellId, items);
-                cell.touched = true;
-                brokenCell.touched = true;
-                recipes.Add(new Recipe
-                {
-                    id = "r:startcalc:solar_power/" + InternalName(cellId),
-                    recipeType = type,
-                    itemInputs = new[]
-                    {
-                        new RecipeInput<Item> { goods = cell, amount = 1, slot = 0, probability = Prob(null), tierChanceBoost = 0 },
-                    },
-                    oreDictInputs = Array.Empty<RecipeInput<OreDict>>(),
-                    fluidInputs = Array.Empty<RecipeInput<Fluid>>(),
-                    itemOutputs = new[]
-                    {
-                        new RecipeProduct<Item> { goods = brokenCell, amount = 1, slot = 0, probability = Prob(null), tierChanceBoost = 0 },
-                    },
-                    fluidOutputs = Array.Empty<RecipeProduct<Fluid>>(),
-                    gtInfo = new GtRecipeInfo
-                    {
-                        voltage = -voltageOut,
-                        durationTicks = durability * SolarCycleTicks,
-                        amperage = 1,
-                        voltageTier = VoltageTiers.GetVoltageTierFromRaw(voltageOut),
-                        metadata = new[] { new RecipeMetadata { key = "solar_heating_modifier", value = heatingModifier.ToString(CultureInfo.InvariantCulture) } },
-                    },
-                });
-            }
-        }
-
-        #endregion
-
         #region Hardcoded recipe transforms
-
-        private static List<RecipeJson> TransformSolarPanelReplacement(RecipeJson rj, Dictionary<string, Item> items)
-        {
-            var cellId = (rj.itemInputs ?? Empty).Values
-                .Select(stack => stack.key)
-                .FirstOrDefault(IsSolarCell);
-            if (cellId == null)
-                return new List<RecipeJson> { rj };
-
-            var brokenCell = EnsureBrokenSolarCell(cellId, items);
-            foreach (var output in (rj.itemOutputs ?? Empty).Values)
-            {
-                if (output.key == cellId || output.key.StartsWith(cellId + "#"))
-                    output.key = ItemKey(brokenCell);
-            }
-            return new List<RecipeJson> { rj };
-        }
-
-        private static List<RecipeJson> TransformCanner(RecipeJson rj, Dictionary<string, Item> items)
-        {
-            if (rj.id == null || !rj.id.StartsWith("start:canner/") || !rj.id.EndsWith("_solar_cell_repair"))
-                return new List<RecipeJson> { rj };
-
-            foreach (var input in (rj.itemInputs ?? Empty).Values)
-            {
-                if (IsSolarCell(input.key))
-                    input.key = ItemKey(EnsureBrokenSolarCell(input.key, items));
-            }
-            return new List<RecipeJson> { rj };
-        }
-
-        private static bool IsSolarCell(string itemId)
-            => itemId != null && SolarCells.Any(cell => cell.id == itemId);
 
         private static string ItemKey(Item item)
             => item.mod + ":" + item.internalName;
 
-        private static Item EnsureBrokenSolarCell(string cellId, Dictionary<string, Item> items)
-        {
-            var brokenId = cellId + "_broken";
-            if (items.TryGetValue(brokenId, out var existing))
-                return existing;
-            if (!items.TryGetValue(cellId, out var intact))
-                throw new InvalidDataException($"Cannot synthesize broken solar cell for missing item '{cellId}'");
-            var exportedBroken = items
-                .Where(entry => entry.Key.StartsWith(cellId + "#"))
-                .Select(entry => entry.Value)
-                .FirstOrDefault() ?? intact;
-
-            var broken = new Item
-            {
-                name = "Broken " + Regex.Replace(intact.name, "\u00A7.", ""),
-                mod = intact.mod,
-                internalName = intact.internalName + "_broken",
-                tooltip = "",
-                nbt = null,
-                stackSize = intact.stackSize,
-                damage = intact.damage,
-                numericId = intact.numericId,
-                imagePath = exportedBroken.imagePath,
-            };
-            items[brokenId] = broken;
-            return broken;
-        }
-
-        // gtceu:bacterial_hydrocarbon_harvester:
-        //  - strip nbt from item inputs (synthesizing a clean item when no nbt-less base exists),
-        //  - force the minecraft:sugar input count to 2,
-        //  - force the #forge:biomass fluid input to 200,
-        //  - expand into one recipe per permutation of the first 3 fluid output keys (amounts stay
-        //    bound to their slot; only the keys are permuted).
-        private static List<RecipeJson> TransformBacterialHydrocarbonHarvester(RecipeJson rj, Dictionary<string, Item> items)
-        {
-            foreach (var stack in (rj.itemInputs ?? Empty).Values)
-            {
-                stack.key = StripItemNbt(stack.key, items);
-                if (stack.key == "minecraft:sugar")
-                    stack.count = 2;
-            }
-
-            foreach (var stack in (rj.fluidInputs ?? Empty).Values)
-            {
-                if (stack.key == "#forge:biomass")
-                    stack.amount = 200;
-            }
-
-            return PermuteFirstNFluidOutputKeys(rj, 3);
-        }
-
-        // gtceu:bacterial_breeding_vat:
-        //  - strip nbt from item inputs and item outputs (synthesizing clean items as needed),
-        //  - combine item outputs that became the same item after stripping (summing their counts).
-        private static List<RecipeJson> TransformBacterialBreedingVat(RecipeJson rj, Dictionary<string, Item> items)
-        {
-            foreach (var stack in (rj.itemInputs ?? Empty).Values)
-                stack.key = StripItemNbt(stack.key, items);
-            foreach (var stack in (rj.itemOutputs ?? Empty).Values)
-                stack.key = StripItemNbt(stack.key, items);
-
-            rj.itemOutputs = CombineSameItemStacks(rj.itemOutputs);
-            return new List<RecipeJson> { rj };
-        }
-
-        // Merges item stacks that share the same key into a single stack, summing counts and keeping
-        // the lowest slot number. Used after nbt-stripping makes formerly-distinct variants identical.
         private static Dictionary<string, StackJson> CombineSameItemStacks(Dictionary<string, StackJson> stacks)
         {
             if (stacks == null)
@@ -1021,7 +785,6 @@ namespace Source
             {
                 var plainText = Regex.Replace(line, "§.", "").Trim();
                 return !plainText.Equals("Hold [W] to Ponder", StringComparison.OrdinalIgnoreCase) &&
-                    !plainText.Equals("Added by Star Technology", StringComparison.OrdinalIgnoreCase) &&
                     !Regex.IsMatch(plainText, "^-+$");
             }).ToList() ?? new();
 

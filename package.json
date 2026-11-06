@@ -1,7 +1,7 @@
 {
-  "name": "gtnh-calc",
+  "name": "monifactory-calc",
   "version": "1.0.0",
-  "description": "GregTech: New Horizons calculator",
+  "description": "Monifactory calculator",
   "main": "index.js",
   "scripts": {
     "copy-files": "copyfiles -u 0 \"index.html\" \"assets/**/*\" \"data/**/*\" dist/",
@@ -11,7 +11,7 @@
     "test:watch": "jest --watch",
     "test:snapshot": "jest --updateSnapshot",
     "pretest": "tsc",
-    "process-data": "dotnet run --project export/export.csproj -- export-data --output data"
+    "process-data": "dotnet run --project export/export.csproj -c Release --"
   },
   "keywords": [
     "gregtech",

@@ -1,31 +1,40 @@
-# Star Technology Calculator
+# Monifactory Calculator
 
-[![Tests](https://github.com/alexperovich/star-technology/actions/workflows/deploy.yml/badge.svg)](https://github.com/alexperovich/star-technology/actions/workflows/deploy.yml)
-
-A calculator for the Star Technology modpack recipes and production chains.
-This project was adapted from the [original GregTech: New Horizons calculator](https://github.com/ShadowTheAge/gtnh) by ShadowTheAge.
+A calculator for [Monifactory](https://www.curseforge.com/minecraft/modpacks/monifactory) recipes and production chains.
+It is adapted from the Star Technology calculator, which in turn was adapted from the
+[GregTech: New Horizons calculator](https://github.com/ShadowTheAge/gtnh) by ShadowTheAge.
 Large parts of this project were written using AI assistance, so code style and quality are all over the place.
 
-Data building is done using the [recipe data exporter](https://github.com/alexperovich/recipe-data-exporter) mod and a C# processing tool. See [export/README.md](export/README.md) for detailed instructions.
+Targets Monifactory **0.13.8** (Minecraft 1.20.1, Forge, GTCEu 7.5.3).
 
 ## Development
 
-To run this project locally:
-
-1. Clone the repository
-2. Install dependencies:
 ```bash
 npm install
+npm start      # dev server on http://localhost:5500
+npm test       # builds with tsc, then runs jest against data/data.bin
+npm run build  # production build into dist/
 ```
-3. Start the development server:
-```bash
-npm start
-```
+
+`data/data.bin` and `data/atlas.webp` are committed and generated from a Monifactory instance.
+See [export/README.md](export/README.md) for how to regenerate them.
+
+## Notes on machine modelling
+
+Multiblock behaviour is derived from each machine's exported recipe-modifier ids
+(`oc_perfect`, `ebf_oc`, `parallel_hatch`, ...), see `src/machines.ts`. Multiblocks whose
+modifiers are not modelled (for example addon machines such as the Mega Blast Furnace) are
+shown with a default non-perfect overclock and an informational note.
 
 ## License
 
 The code is under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-However, the project contains some assets from Minecraft (Mojang trademark and copyright), the Star Technology development team, and respective mod authors. These assets are used under fair use.
+This project is a derivative work of [ShadowTheAge/gtnh](https://github.com/ShadowTheAge/gtnh)
+(the GregTech: New Horizons calculator, MIT License, Copyright (c) 2025 ShadowTheAge).
+The original copyright and license notice are retained in [LICENSE](LICENSE).
+
+The project contains assets from Minecraft (Mojang trademark and copyright), the Monifactory
+team, and respective mod authors. These assets are used under fair use.
 
 Font used: [F77 Minecraft by 123467](https://www.fontspace.com/f77-minecraft-font-f30628)
