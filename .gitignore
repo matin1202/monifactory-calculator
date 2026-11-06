@@ -2,3 +2,4 @@ node_modules/
 *.log
 dist/
 export-data
+graphify-out/

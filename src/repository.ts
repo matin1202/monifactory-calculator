@@ -1,5 +1,5 @@
 import { SearchQuery } from "./searchQuery.js";
-import { SetCoilTiers, CoilTier, SetRotorHolders, RotorHolderTier, SetTurbineRotors, TurbineRotor, SetReflectorTiers, ReflectorTier, SetParallelHatchTiers, SetAbsoluteParallelHatchTiers, ParallelHatchTier, stripFormatting } from "./utils.js";
+import { SetCoilTiers, CoilTier, SetRotorHolders, RotorHolderTier, SetTurbineRotors, TurbineRotor, SetParallelHatchTiers, SetAbsoluteParallelHatchTiers, ParallelHatchTier, stripFormatting } from "./utils.js";
 
 const charCodeItem = "i".charCodeAt(0);
 const charCodeFluid = "f".charCodeAt(0);
@@ -56,7 +56,6 @@ export class Repository
         repository.LoadCoilTiers();
         repository.LoadRotorHolders();
         repository.LoadTurbineRotors();
-        repository.LoadReflectorTiers();
         repository.LoadParallelHatches();
         return repository;
     }
@@ -151,34 +150,6 @@ export class Repository
             return;
         rotors.sort((a, b) => a.power - b.power || a.name.localeCompare(b.name));
         SetTurbineRotors(rotors);
-    }
-
-    private LoadReflectorTiers() {
-        const tiers:ReflectorTier[] = [];
-        const seen = new Set<number>();
-        for (let i = 0; i < this.items.length; i++) {
-            const item = this.GetObject(this.items[i], Item);
-            if (!item.internalName.endsWith("_reflector_casing"))
-                continue;
-            // The tier is encoded in the tooltip ("Tier T<n>"), not in metadata.
-            const tooltip = stripFormatting(item.tooltip ?? "");
-            const match = tooltip.match(/Tier\s+T(\d+)/);
-            if (!match)
-                continue;
-            const tier = parseInt(match[1], 10);
-            if (seen.has(tier))
-                continue;
-            seen.add(tier);
-            let name = stripFormatting(item.name);
-            const suffix = " Neutron Reflector Casing";
-            if (name.endsWith(suffix))
-                name = name.slice(0, -suffix.length);
-            tiers.push({ tier, name });
-        }
-        if (tiers.length === 0)
-            return;
-        tiers.sort((a, b) => a.tier - b.tier);
-        SetReflectorTiers(tiers);
     }
 
     private LoadParallelHatches() {
