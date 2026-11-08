@@ -462,6 +462,9 @@ html {
     }
 
     .panel-tab-bar {
+        /* Own stacking context: inactive tabs use z-index:-1, which would
+           otherwise put them behind this (now touchable) scroll container. */
+        z-index: 0;
         right: 0;
         height: 58px;
         overflow-x: auto;
