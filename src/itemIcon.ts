@@ -1,18 +1,28 @@
 import { Repository, Goods, Item, Fluid, OreDict, RecipeObject } from "./repository.js";
 import { NeiSelect, ShowNei, ShowNeiContext, ShowNeiMode } from "./nei.js";
 import { ShowTooltip, HideTooltip, IsHovered } from "./tooltip.js";
+import { IsTouchUI } from "./utils.js";
 
 // Global cycling state
 let globalIndex = 0;
 let oredictElements: IconBox[] = [];
 
 // Global actions map
-export const actions: { [key: string]: string } = {
+const touch = IsTouchUI();
+export const actions: { [key: string]: string } = touch ? {
+    "item_icon_click": "Tap / long-press to add recipe",
+    "select": "Tap to select",
+    "toggle_link_ignore": "Tap to toggle link ignore",
+    "crafter_click": "Tap to select another crafter"
+} : {
     "item_icon_click": "Left/Right click to add recipe",
     "select": "Click to select",
     "toggle_link_ignore": "Click to toggle link ignore",
     "crafter_click": "Click to select another crafter"
 };
+const defaultAction = touch
+    ? "Tap: production, long-press: consumption"
+    : "Left/Right click to view Production/Consumption for this item";
 
 // Start global cycle once
 window.setInterval(() => {
@@ -39,7 +49,7 @@ export class IconBox extends HTMLElement
                 const actionText = actionType ? actions[actionType] : undefined;
                 ShowTooltip(this, {
                     goods: obj,
-                    action: actionText ?? "Left/Right click to view Production/Consumption for this item"
+                    action: actionText ?? defaultAction
                 });
                 
                 this.UpdateHighlightStyle();
