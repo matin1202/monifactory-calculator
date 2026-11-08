@@ -16,6 +16,7 @@ try {
 
     // Then load other modules
     await Promise.all([
+        import("./touch.js"),
         import("./itemIcon.js"),
         import("./tooltip.js"),
         import("./nei.js"),

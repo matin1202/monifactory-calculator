@@ -1,7 +1,10 @@
 import { ShowNei, ShowNeiMode, ShowNeiCallback } from "./nei.js";
 import { Goods, Repository, Item, Fluid, Recipe } from "./repository.js";
 import { UpdateProject, addProjectChangeListener, GetByIid, RecipeModel, RecipeGroupModel, ProductModel, ModelObject, PageModel, DragAndDrop, page, FlowInformation, LinkAlgorithm, CopyCurrentPageUrl, DownloadCurrentPage, Search } from "./page.js";
-import { voltageTier, formatAmount } from "./utils.js";
+import { voltageTier, formatAmount, IsTouchUI } from "./utils.js";
+
+// HTML drag and drop fights with scrolling and long-press on touch screens.
+const draggableAttr = IsTouchUI() ? "" : ' draggable="true"';
 import { ShowTooltip } from "./tooltip.js";
 import { IconBox } from "./itemIcon.js";
 import { ShowDropdown, HideDropdown } from "./dropdown.js";
@@ -526,6 +529,12 @@ export class RecipeList {
         // Hide search by default
         this.searchContainer.classList.add('hidden');
 
+        // Show search from the toolbar button (touch screens have no Ctrl+F)
+        document.querySelector('.search-toggle')?.addEventListener('click', () => {
+            this.searchContainer.classList.remove('hidden');
+            this.searchInput.focus();
+        });
+
         // Show search on Ctrl+F
         document.addEventListener('keydown', (e: KeyboardEvent) => {
             if (e.ctrlKey && e.key === 'f') {
@@ -645,15 +654,15 @@ export class RecipeList {
         }
 
         return `
-            <td class="text-small white-text">
+            <td class="text-small white-text cell-energy">
                 ${renderEnergyItems(flow.energy)}
             </td>
-            <td>
+            <td class="cell-in" data-label="IN/${page.settings.timeUnit}">
                 <div class="io-items">
                     ${renderFlowItems(flow.input, group)}
                 </div>
             </td>
-            <td>
+            <td class="cell-out" data-label="OUT/${page.settings.timeUnit}">
                 <div class="io-items">
                     ${renderFlowItems(flow.output, group)}
                 </div>
@@ -664,7 +673,7 @@ export class RecipeList {
     private renderRecipeShortInfo(recipe: Recipe | null, recipeModel: RecipeModel, group: RecipeGroupModel): string {
         if (recipe === null) {
             return `
-                <td colspan="2">
+                <td colspan="2" class="cell-info cell-missing">
                     <span style="color: red;">Missing recipe</span>
                     <div class="text-small">This recipe was deleted or changed. Replace or remove it. (Or load a different version of this app)</div>
                 </td>
@@ -767,21 +776,21 @@ export class RecipeList {
             shortInfoContent += `<span class="text-small white-text">${GetParameter(machineInfo.info, recipeModel)}</span>`;
         }
 
-        let iconCell = `<td><div class="icon-container"><item-icon data-id="${crafter.id}" data-action="crafter_click" data-iid="${recipeModel.iid}" data-amount="${machineCountsText}">`+
+        let iconCell = `<td class="cell-icon"><div class="icon-container"><item-icon data-id="${crafter.id}" data-action="crafter_click" data-iid="${recipeModel.iid}" data-amount="${machineCountsText}">`+
             `${recipeModel.fixedCrafterCount !== undefined ? `<span class="probability">FIXED</span>` : ''}`+
             `</item-icon></div></td>`;
 
-        let shortInfoCell = `<td><div class="short-info" data-iid="${recipeModel.iid}">${shortInfoContent}</div></td>`;
+        let shortInfoCell = `<td class="cell-info"><div class="short-info" data-iid="${recipeModel.iid}">${shortInfoContent}</div></td>`;
         return iconCell + shortInfoCell;
     }
 
     private renderRecipe(recipeModel: RecipeModel, group: RecipeGroupModel, level: number = 0): string {
         let recipe = Repository.current.GetById<Recipe>(recipeModel.recipeId);
         return `
-            <tr class="recipe-item" data-iid="${recipeModel.iid}" draggable="true">
+            <tr class="recipe-item" data-iid="${recipeModel.iid}"${draggableAttr}>
                 ${this.renderRecipeShortInfo(recipe, recipeModel, group)}
                 ${this.renderIoInfo(recipeModel.flow, group)}
-                <td>
+                <td class="cell-actions">
                     <div class="icon-container">
                         <button class="delete-btn" data-iid="${recipeModel.iid}" data-action="change_recipe" data-tooltip="change_recipe">↔</button>
                         <button class="delete-btn" data-iid="${recipeModel.iid}" data-action="delete_recipe">x</button>
@@ -793,19 +802,19 @@ export class RecipeList {
 
     private renderCollapsedGroup(group: RecipeGroupModel, parentGroup: RecipeGroupModel, level: number = 0): string {
         return `
-            <tr class="recipe-group collapsed" data-iid="${group.iid}" draggable="true">
-                <td>
+            <tr class="recipe-group collapsed" data-iid="${group.iid}"${draggableAttr}>
+                <td class="cell-icon">
                     <div class="icon-container">
                         <button class="expand-btn icon-button" data-iid="${group.iid}" data-action="toggle_collapse"></button>
                     </div>
                 </td>
-                <td>
+                <td class="cell-info">
                     <div class="short-info">
                         <div class="group-name">${group.name}</div>
                     </div>
                 </td>
                 ${this.renderIoInfo(group.flow, parentGroup)}
-                <td>
+                <td class="cell-actions">
                     <div class="icon-container">
                         <button class="delete-btn" data-iid="${group.iid}" data-action="delete_group">x</button>
                     </div>
@@ -819,7 +828,7 @@ export class RecipeList {
             <tr class="recipe-group expanded" data-iid="${group.iid}">
                 <td colspan="6" class="expanded-group-cell nested-level-${level%2}">
                     <table class="recipe-table">
-                        <tr>
+                        <tr class="group-header-row">
                             <th class="icon-cell">
                                 <div class="icon-container">
                                     <button class="collapse-btn icon-button" data-iid="${group.iid}" data-action="toggle_collapse"></button>
@@ -839,11 +848,11 @@ export class RecipeList {
                                 </div>
                             </th>
                         </tr>
-                        <tr>
-                            <td></td>
-                            <td>Group total:</td>
+                        <tr class="total-row">
+                            <td class="cell-icon"></td>
+                            <td class="cell-info">Group total:</td>
                             ${this.renderIoInfo(group.flow, group)}
-                            <td></td>
+                            <td class="cell-actions"></td>
                         </tr>
                         ${this.renderLinks(group.actualLinks, group)}
                         ${group.elements.map(entry => {
@@ -903,7 +912,7 @@ export class RecipeList {
         return `
             <table class="recipe-table root-group" data-iid="${group.iid}">
                 <thead>
-                    <tr>
+                    <tr class="root-header-row">
                         <th class="icon-cell"></th>
                         <th class="short-info-cell"></th>
                         <th class="energy-cell">POWER</th>
@@ -911,11 +920,11 @@ export class RecipeList {
                         <th class="outputs-cell">OUTPUTS/${page.settings.timeUnit}</th>
                         <th class="action-cell"></th>
                     </tr>
-                    <tr>
-                        <td></td>
-                        <td>Grand total:</td>
+                    <tr class="total-row">
+                        <td class="cell-icon"></td>
+                        <td class="cell-info">Grand total:</td>
                         ${this.renderIoInfo(group.flow, group)}
-                        <td></td>
+                        <td class="cell-actions"></td>
                     </tr>
                 </thead>
                 <tbody>

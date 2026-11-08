@@ -66,8 +66,12 @@ export class Dropdown {
         // Save some space for dynamic parts of the dropdown.
         const spaceBelow = window.innerHeight - targetRect.bottom - 50;
         
-        this.dropdown.style.top = `${targetRect.bottom - Math.max(0, (dropdownRect.height - spaceBelow))}px`;
-        this.dropdown.style.left = `${targetRect.right + Math.max(0, (targetRect.width - dropdownRect.width) / 2)}px`;
+        const top = targetRect.bottom - Math.max(0, (dropdownRect.height - spaceBelow));
+        const left = targetRect.right + Math.max(0, (targetRect.width - dropdownRect.width) / 2);
+        // Keep the dropdown on screen (matters on narrow phone screens).
+        const maxLeft = window.innerWidth - dropdownRect.width - 4;
+        this.dropdown.style.top = `${Math.max(4, top)}px`;
+        this.dropdown.style.left = `${Math.max(4, Math.min(left, maxLeft))}px`;
     }
 
     public hide(): void {

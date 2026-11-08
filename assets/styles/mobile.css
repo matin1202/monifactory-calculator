@@ -1,0 +1,497 @@
+/*
+ * Mobile / touch adaptations.
+ * Loaded last so it can override the desktop styles.
+ */
+
+html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+}
+
+/* Search button: only shown on small screens (desktop uses Ctrl+F) */
+.search-toggle {
+    display: none;
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 998;
+    padding: 4px 8px;
+}
+
+.search-toggle svg {
+    display: block;
+    margin: 3px 0;
+}
+
+/* ---------- Tablets and smaller: menu becomes a drawer ---------- */
+@media screen and (max-width: 1200px) {
+    .search-toggle {
+        display: block;
+    }
+
+    #menu.visible {
+        box-shadow: 4px 0 16px rgba(0, 0, 0, 0.6);
+    }
+
+    .status-message {
+        margin-right: 48px;
+    }
+}
+
+/* ---------- Touch screens (no hover) ---------- */
+@media (hover: none), (pointer: coarse) {
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        /* Removes the double-tap-to-zoom delay on taps */
+        touch-action: manipulation;
+    }
+
+    /* Tooltips appear on tap and close on the next touch; let touches pass through them */
+    #tooltip {
+        pointer-events: none;
+    }
+
+    /* Long-press on an icon is "right click": suppress the iOS callout / text selection */
+    item-icon,
+    .panel-tab {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* :hover sticks after a tap on touch screens; use :active for feedback instead */
+    button:hover {
+        box-shadow: 0 0 0 2px black;
+    }
+
+    button:active {
+        box-shadow: 0 0 0 2px white;
+    }
+
+    .icon-button:hover,
+    .icon-button:active {
+        box-shadow: none;
+    }
+}
+
+/* ---------- Phones ---------- */
+@media screen and (max-width: 760px) {
+    body {
+        min-width: 0;
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    #main {
+        gap: 0;
+    }
+
+    h2 {
+        font-size: 20px;
+        margin: 8px 0;
+    }
+
+    .menu-toggle,
+    .search-toggle {
+        top: 8px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    .menu-toggle {
+        left: 8px;
+    }
+
+    .search-toggle {
+        right: 8px;
+    }
+
+    #menu {
+        width: min(320px, 85vw);
+        min-width: 0;
+        box-sizing: border-box;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .menu-header {
+        font-size: 20px;
+        margin-top: 44px;
+    }
+
+    .new-page-form input {
+        flex: 1;
+        width: auto;
+        min-width: 0;
+    }
+
+    .new-page-form button {
+        width: auto;
+    }
+
+    .page-button,
+    .active-page {
+        min-height: 36px;
+    }
+
+    #recipe-list {
+        min-width: 0;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+        gap: 4px;
+    }
+
+    #recipe-list > * {
+        flex-shrink: 0;
+    }
+
+    .status-message {
+        width: auto;
+        margin-left: 52px;
+        margin-right: 52px;
+        min-height: 24px;
+        font-size: 12px;
+        line-height: 16px;
+    }
+
+    /* Search bar becomes a full-width bar at the top */
+    .search-container {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        z-index: 1001;
+    }
+
+    .search-container input {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .search-container button {
+        min-width: 40px;
+    }
+
+    /* ----- Products ----- */
+    .product-item {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 4px;
+        font-size: 12px;
+        line-height: 16px;
+    }
+
+    .product-item .amount {
+        width: 72px;
+        flex-shrink: 0;
+    }
+
+    .product-item .amount-unit,
+    .product-item item-icon {
+        flex-shrink: 0;
+    }
+
+    .product-item .delete-btn {
+        margin-left: auto;
+    }
+
+    .add-product-btn {
+        width: 100%;
+        margin-top: 4px;
+        min-height: 40px;
+    }
+
+    /* ----- Recipe table -> stacked cards ----- */
+    .recipe-table,
+    .recipe-table > thead,
+    .recipe-table > tbody,
+    .recipe-table tr,
+    .recipe-table td,
+    .recipe-table th {
+        display: block;
+        box-sizing: border-box;
+    }
+
+    .recipe-table td,
+    .recipe-table .nested-level-1 td {
+        border: none;
+    }
+
+    .root-header-row {
+        display: none !important;
+    }
+
+    .recipe-item,
+    .recipe-group.collapsed,
+    .total-row {
+        display: grid !important;
+        grid-template-columns: 40px minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas:
+            "icon   info   info   actions"
+            "icon   energy energy energy"
+            "in     in     out    out";
+        column-gap: 6px;
+        row-gap: 2px;
+        padding: 6px 4px;
+        border-bottom: 1px solid #3a3a3a;
+        align-items: start;
+    }
+
+    .total-row {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+
+    .total-row .cell-info {
+        grid-column: 1 / 4;
+    }
+
+    .total-row .cell-energy {
+        grid-column: 1 / 5;
+    }
+
+    .total-row .cell-icon,
+    .total-row .cell-actions:empty {
+        display: none;
+    }
+
+    .cell-icon     { grid-area: icon; }
+    .cell-info     { grid-area: info; min-width: 0; }
+    .cell-energy   { grid-area: energy; }
+    .cell-in       { grid-area: in; }
+    .cell-out      { grid-area: out; }
+    .cell-actions  { grid-area: actions; }
+
+    .cell-missing {
+        grid-area: auto;
+        grid-column: 1 / 4;
+        grid-row: 1;
+    }
+
+    .cell-icon .icon-container {
+        justify-content: flex-start;
+        padding-top: 2px;
+    }
+
+    .cell-energy {
+        line-height: 12px;
+        color: #aaaaaa;
+    }
+
+    /* "LV: 1A<br><br>EU/t: 32" -> two compact lines */
+    .cell-energy br + br {
+        display: none;
+    }
+
+    .cell-out {
+        padding-left: 6px;
+        border-left: 1px solid #3a3a3a;
+    }
+
+    .cell-in::before,
+    .cell-out::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 8px;
+        line-height: 12px;
+        color: #888888;
+        margin-top: 4px;
+    }
+
+    .cell-in:not(:has(item-icon)),
+    .cell-out:not(:has(item-icon)) {
+        display: none;
+    }
+
+    .io-items {
+        row-gap: 10px;
+        column-gap: 6px;
+        padding-bottom: 6px;
+    }
+
+    .short-info {
+        font-size: 14px;
+        line-height: 20px;
+    }
+
+    .short-info select {
+        margin-bottom: 2px;
+    }
+
+    .cell-actions .icon-container {
+        gap: 4px;
+    }
+
+    .delete-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    .collapse-btn,
+    .expand-btn {
+        width: 32px;
+        height: 32px;
+        background-size: 32px 32px;
+    }
+
+    /* Expanded group: header row with collapse / name / delete */
+    .expanded-group-cell {
+        padding: 2px 0 2px 4px;
+        border-left: 2px solid #4CAF50 !important;
+        margin: 4px 0;
+    }
+
+    .group-header-row {
+        display: flex !important;
+        align-items: center;
+        gap: 6px;
+        padding: 4px;
+    }
+
+    .group-header-row .energy-cell,
+    .group-header-row .inputs-cell,
+    .group-header-row .outputs-cell {
+        display: none !important;
+    }
+
+    .group-header-row .short-info-cell {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .group-name-input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .group-links td,
+    .group-buttons td {
+        padding: 6px 4px;
+    }
+
+    .group-buttons {
+        line-height: 28px;
+    }
+
+    .machine-choice-container {
+        padding-left: 0;
+        text-indent: 0;
+    }
+
+    .machine-choices input {
+        width: 80px;
+    }
+
+    select {
+        max-width: 100%;
+    }
+
+    /* ----- Settings ----- */
+    .setting-item {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 6px;
+    }
+
+    .share-links {
+        line-height: 28px;
+    }
+
+    /* ----- Overlays ----- */
+    #panels {
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    #tooltip,
+    #dropdown {
+        max-width: calc(100vw - 8px);
+        box-sizing: border-box;
+    }
+
+    #tooltip {
+        font-size: 14px;
+        line-height: 18px;
+    }
+
+    .dropdown-list {
+        min-width: 0;
+    }
+
+    .dropdown-item {
+        min-height: 36px;
+        flex-wrap: wrap;
+    }
+
+    .crafter-count {
+        width: 100px;
+    }
+
+    #loading {
+        padding: 24px;
+        max-width: calc(100vw - 48px);
+        box-sizing: border-box;
+    }
+
+    #loading h1 {
+        font-size: 40px;
+        margin: 8px 0;
+    }
+
+    #confirm-dialog {
+        max-width: calc(100vw - 24px);
+        max-height: calc(100dvh - 24px);
+        box-sizing: border-box;
+        padding: 12px;
+        overflow-y: auto;
+    }
+
+    #confirm-dialog button {
+        min-width: 0;
+        flex: 1;
+        min-height: 40px;
+    }
+
+    /* ----- NEI ----- */
+    .panel-tab-container {
+        max-width: 100vw;
+    }
+
+    .panel-tab-bar {
+        right: 0;
+        height: 58px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        pointer-events: auto;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .panel-tab-bar::-webkit-scrollbar {
+        display: none;
+    }
+
+    .panel-tabs {
+        flex-shrink: 0;
+    }
+
+    #nei .hgroup {
+        gap: 4px;
+        padding: 4px;
+        box-sizing: border-box;
+    }
+
+    #nei-search {
+        min-width: 0;
+    }
+
+    #nei-back,
+    #nei-close {
+        min-width: 40px;
+        min-height: 36px;
+    }
+}

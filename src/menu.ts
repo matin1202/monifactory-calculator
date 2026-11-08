@@ -440,3 +440,19 @@ document.addEventListener('click', (e: MouseEvent): void => {
         menu.classList.remove('visible');
     }
 });
+// On small screens the menu is a slide-out drawer: start closed so the
+// calculator is what you see first, and close it once a page or NEI is chosen.
+const smallScreenQuery = window.matchMedia('(max-width: 1200px)');
+if (smallScreenQuery.matches) {
+    menu.classList.remove('visible');
+}
+menuToggle.setAttribute('aria-label', 'Menu');
+
+menu.addEventListener('click', (e: MouseEvent): void => {
+    if (!smallScreenQuery.matches)
+        return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.page-button, #nei-link')) {
+        menu.classList.remove('visible');
+    }
+});

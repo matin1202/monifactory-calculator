@@ -73,7 +73,15 @@ export function ShowTooltip(target: HTMLElement, data: TooltipData): void {
     tooltipData = data;
     ShowTooltipRaw(target, header, debug, text, mod, action, recipe, overrideIo);
     target.focus();
-    target.addEventListener("mouseleave", () => HideTooltip(target), { once: true });
+    target.addEventListener("mouseleave", function onLeave() {
+        // After a tap, browsers send a synthetic mouseleave right away. Keep the
+        // tooltip open; it is closed by the next touch instead.
+        if (lastPointerType === "touch") {
+            target.addEventListener("mouseleave", onLeave, { once: true });
+            return;
+        }
+        HideTooltip(target);
+    }, { once: true });
     if (tooltipScrollCache.has(target)) {
         tooltipScrollTarget = tooltipScrollCache.get(target)!;
     } else {
@@ -125,17 +133,35 @@ function ShowTooltipRaw(target:HTMLElement, header:string, debug:string|null, de
 function PositionTooltip(target:HTMLElement) {
     const targetRect = target.getBoundingClientRect();
     const tooltipRect = tooltip.getBoundingClientRect();
+    const viewWidth = window.innerWidth;
+    const viewHeight = window.innerHeight;
 
-    const isRightHalf = targetRect.left > window.innerWidth / 2;
+    const spaceLeft = targetRect.left;
+    const spaceRight = viewWidth - targetRect.right;
+    const preferLeft = targetRect.left > viewWidth / 2;
+    const fitsLeft = tooltipRect.width <= spaceLeft;
+    const fitsRight = tooltipRect.width <= spaceRight;
 
-    if (isRightHalf) {
+    if ((preferLeft && fitsLeft) || (!fitsRight && fitsLeft)) {
         tooltip.style.left = `${targetRect.left - tooltipRect.width}px`;
-    } else {
+    } else if (fitsRight) {
         tooltip.style.left = `${targetRect.right}px`;
+    } else {
+        // Narrow screen: no room beside the target, so place it below (or above) instead.
+        const centered = targetRect.left + targetRect.width / 2 - tooltipRect.width / 2;
+        tooltip.style.left = `${Math.max(0, Math.min(centered, viewWidth - tooltipRect.width))}px`;
+        if (targetRect.bottom + tooltipRect.height <= viewHeight) {
+            tooltip.style.top = `${targetRect.bottom}px`;
+        } else if (targetRect.top - tooltipRect.height >= 0) {
+            tooltip.style.top = `${targetRect.top - tooltipRect.height}px`;
+        } else {
+            tooltip.style.top = `${Math.max(0, viewHeight - tooltipRect.height)}px`;
+        }
+        return;
     }
 
-    if (targetRect.top + tooltipRect.height > window.innerHeight) {
-        tooltip.style.top = `${window.innerHeight - tooltipRect.height}px`;
+    if (targetRect.top + tooltipRect.height > viewHeight) {
+        tooltip.style.top = `${Math.max(0, viewHeight - tooltipRect.height)}px`;
     } else {
         tooltip.style.top = `${Math.max(targetRect.top, 0)}px`;
     }
@@ -240,6 +266,24 @@ window.addEventListener("blur", () => {
         return;
     shiftHeld = false;
     RefreshInteractiveTooltip();
+});
+
+let lastPointerType = "mouse";
+for (const type of ["pointerdown", "pointermove"]) {
+    document.addEventListener(type, (e) => {
+        lastPointerType = (e as PointerEvent).pointerType;
+    }, { capture: true, passive: true });
+}
+
+// Touch screens don't send a reliable "mouseleave", so a tooltip opened by a tap would stay
+// forever. Close it as soon as the next touch starts anywhere.
+document.addEventListener("touchstart", () => {
+    if (currentTooltipElement)
+        HideTooltip(currentTooltipElement);
+}, { capture: true, passive: true });
+window.addEventListener("resize", () => {
+    if (currentTooltipElement)
+        HideTooltip(currentTooltipElement);
 });
 
 export function HideTooltip(target:HTMLElement)

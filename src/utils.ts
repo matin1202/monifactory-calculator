@@ -265,3 +265,8 @@ export function formatTicksAsTime(ticks:number): string {
 
     return result;
 }
+// True on devices whose primary input can't hover (phones, tablets).
+export function IsTouchUI(): boolean {
+    return typeof window !== "undefined" && typeof window.matchMedia === "function"
+        && window.matchMedia("(hover: none), (pointer: coarse)").matches;
+}
