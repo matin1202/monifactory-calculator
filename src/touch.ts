@@ -6,10 +6,10 @@
 // To behave the same everywhere we detect the long press ourselves, dispatch a
 // synthetic "contextmenu" event, and swallow the browser's own one.
 
-import { IconBox, IsRecipeOutputIcon } from "./itemIcon.js";
+import { IconBox, IsRecipeOutputIcon, recipeInputAction, recipeOutputAction } from "./itemIcon.js";
 import { ShowTooltip } from "./tooltip.js";
 
-const LONG_PRESS_MS = 500;
+const LONG_PRESS_MS = 600;
 const DOUBLE_TAP_MS = 300;
 // Item icons in the recipe list: tap / double-tap search recipes, long-press shows the name.
 const RECIPE_IO_ICON = 'item-icon[data-action="item_icon_click"]';
@@ -56,7 +56,7 @@ document.addEventListener("touchstart", (e: TouchEvent) => {
         if (el.matches(RECIPE_IO_ICON) && el instanceof IconBox) {
             const goods = el.GetDisplayObject();
             if (goods)
-                ShowTooltip(el, { goods, action: el.getAttribute("data-amount") ? `Amount: ${el.getAttribute("data-amount")}` : null });
+                ShowTooltip(el, { goods, action: IsRecipeOutputIcon(el) ? recipeOutputAction : recipeInputAction });
             return;
         }
         el.dispatchEvent(new MouseEvent("contextmenu", {

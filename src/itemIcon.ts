@@ -20,8 +20,8 @@ export const actions: { [key: string]: string } = touch ? {
     "toggle_link_ignore": "Click to toggle link ignore",
     "crafter_click": "Click to select another crafter"
 };
-const recipeInputAction = "Tap: recipes making it\nDouble-tap: recipes using it\nLong-press: details";
-const recipeOutputAction = "Tap: recipes using it\nDouble-tap: recipes making it\nLong-press: details";
+export const recipeInputAction = "Tap: recipes making it\nDouble-tap: recipes using it";
+export const recipeOutputAction = "Tap: recipes using it\nDouble-tap: recipes making it";
 
 // Whether an icon is a result (output) of a recipe/group row in the recipe list.
 export function IsRecipeOutputIcon(icon: Element): boolean {
@@ -54,9 +54,12 @@ export class IconBox extends HTMLElement
             const obj = this.GetDisplayObject();
             if (obj) {
                 const actionType = this.getAttribute('data-action');
-                let actionText = actionType ? actions[actionType] : undefined;
+                // On touch screens, recipe list icons search on tap; their details
+                // only open on a long press (see touch.ts).
                 if (touch && actionType === "item_icon_click")
-                    actionText = IsRecipeOutputIcon(this) ? recipeOutputAction : recipeInputAction;
+                    return;
+                const actionText = actionType ? actions[actionType] : undefined;
+
                 ShowTooltip(this, {
                     goods: obj,
                     action: actionText ?? defaultAction

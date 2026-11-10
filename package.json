@@ -4,8 +4,8 @@
   "description": "Monifactory calculator",
   "main": "index.js",
   "scripts": {
-    "copy-files": "copyfiles -u 0 \"index.html\" \"assets/**/*\" \"data/**/*\" dist/",
-    "start": "concurrently \"tsc --watch\" \"live-server --mount=/:./dist --mount=/data/:./data/ --mount=/assets/:./assets/ --port=5500\"",
+    "copy-files": "node scripts/copy-files.mjs",
+    "start": "concurrently \"tsc --watch\" \"node scripts/serve.mjs\"",
     "build": "tsc && npm run copy-files",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -21,13 +21,15 @@
   "author": "ShadowTheAge",
   "license": "MIT",
   "devDependencies": {
-    "@types/jest": "^29.5.12",
+    "@types/jest": "^30.0.0",
     "concurrently": "^8.2.2",
-    "copyfiles": "^2.4.1",
-    "jest": "^29.7.0",
-    "live-server": "^1.2.2",
-    "ts-jest": "^29.1.2",
+    "javascript-lp-solver": "0.4.24",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.15",
     "typescript": "^5.8.2",
-    "javascript-lp-solver": "0.4.24"
+    "wrangler": "^4.160.0"
+  },
+  "overrides": {
+    "test-exclude": "^8.0.0"
   }
 }
