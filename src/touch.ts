@@ -6,12 +6,11 @@
 // To behave the same everywhere we detect the long press ourselves, dispatch a
 // synthetic "contextmenu" event, and swallow the browser's own one.
 
-import { IconBox, IsRecipeOutputIcon, recipeInputAction, recipeOutputAction } from "./itemIcon.js";
-import { ShowTooltip } from "./tooltip.js";
+import { IconBox, IsRecipeOutputIcon } from "./itemIcon.js";
+import { Dropdown } from "./dropdown.js";
 
 const LONG_PRESS_MS = 600;
-const DOUBLE_TAP_MS = 300;
-// Item icons in the recipe list: tap / double-tap search recipes, long-press shows the name.
+// Item icons in the recipe list: tap searches recipes, long press opens a menu.
 const RECIPE_IO_ICON = 'item-icon[data-action="item_icon_click"]';
 const MOVE_TOLERANCE_PX = 10;
 const LONG_PRESS_TARGETS = "item-icon";
@@ -54,9 +53,7 @@ document.addEventListener("touchstart", (e: TouchEvent) => {
         longPressFired = true;
         navigator.vibrate?.(15);
         if (el.matches(RECIPE_IO_ICON) && el instanceof IconBox) {
-            const goods = el.GetDisplayObject();
-            if (goods)
-                ShowTooltip(el, { goods, action: IsRecipeOutputIcon(el) ? recipeOutputAction : recipeInputAction });
+            ShowRecipeIconMenu(el);
             return;
         }
         el.dispatchEvent(new MouseEvent("contextmenu", {
@@ -112,13 +109,11 @@ document.addEventListener("click", (e: MouseEvent) => {
     }
 }, true);
 
-// Recipe list icons: one tap and a double tap search in opposite directions.
-//   ingredient: tap = recipes making it,  double tap = recipes using it
-//   result:     tap = recipes using it,   double tap = recipes making it
-// The recipe list maps "click" to production and "contextmenu" to consumption.
-let pendingTapTimer = 0;
-let pendingTapTarget: Element | null = null;
-
+// Recipe list icons. The recipe list maps "click" to recipes making the item
+// and "contextmenu" to recipes using it.
+//   ingredient: tap = recipes making it
+//   result:     tap = recipes using it
+//   long press: menu with the item's name and both searches
 function DispatchSearch(icon: Element, production: boolean) {
     icon.dispatchEvent(new MouseEvent(production ? "click" : "contextmenu", {
         bubbles: true,
@@ -127,32 +122,46 @@ function DispatchSearch(icon: Element, production: boolean) {
     }));
 }
 
+function EscapeHtml(text: string): string {
+    return text.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+}
+
+function ShowRecipeIconMenu(icon: IconBox) {
+    const goods = icon.GetDisplayObject();
+    if (!goods)
+        return;
+    const amount = icon.getAttribute("data-amount");
+    const label = icon.closest("[data-label]")?.getAttribute("data-label");
+    const dropdown = Dropdown.getInstance();
+    dropdown.show(icon, container => {
+        container.innerHTML = `
+            <div class="icon-menu">
+                <div class="icon-menu-name">${EscapeHtml(goods.name)}</div>
+                <div class="icon-menu-mod">${EscapeHtml(goods.mod ?? "")}${amount && label ? ` · ${EscapeHtml(label)}: ${EscapeHtml(amount)}` : ""}</div>
+                <button type="button" data-search="production">Recipes making it</button>
+                <button type="button" data-search="consumption">Recipes using it</button>
+            </div>`;
+        container.querySelectorAll<HTMLButtonElement>("[data-search]").forEach(button => {
+            button.addEventListener("click", () => {
+                dropdown.hide();
+                if (icon.isConnected)
+                    DispatchSearch(icon, button.dataset.search === "production");
+            });
+        });
+    });
+}
+
 document.addEventListener("click", (e: MouseEvent) => {
     // Our own re-dispatched events are untrusted; let them through.
     if (!e.isTrusted || Date.now() - lastTouchTime > 1000)
         return;
     const icon = (e.target as Element | null)?.closest?.(RECIPE_IO_ICON);
-    if (!icon)
+    if (!icon || !IsRecipeOutputIcon(icon))
         return;
+    // A result's natural next step is what it is used for.
     e.preventDefault();
     e.stopImmediatePropagation();
-    const isOutput = IsRecipeOutputIcon(icon);
-    if (pendingTapTimer && pendingTapTarget === icon) {
-        window.clearTimeout(pendingTapTimer);
-        pendingTapTimer = 0;
-        pendingTapTarget = null;
-        DispatchSearch(icon, isOutput);
-        return;
-    }
-    if (pendingTapTimer)
-        window.clearTimeout(pendingTapTimer);
-    pendingTapTarget = icon;
-    pendingTapTimer = window.setTimeout(() => {
-        pendingTapTimer = 0;
-        pendingTapTarget = null;
-        if (icon.isConnected)
-            DispatchSearch(icon, !isOutput);
-    }, DOUBLE_TAP_MS);
+    DispatchSearch(icon, false);
 }, true);
 
 export {};

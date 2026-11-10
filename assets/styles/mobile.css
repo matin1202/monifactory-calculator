@@ -23,6 +23,35 @@ html {
     margin: 3px 0;
 }
 
+/* Long-press menu on recipe list icons */
+.icon-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    min-width: 200px;
+    max-width: calc(100vw - 24px);
+    box-sizing: border-box;
+}
+
+.icon-menu-name {
+    font-size: 16px;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+}
+
+.icon-menu-mod {
+    font-size: 12px;
+    color: #8888ff;
+    margin-bottom: 4px;
+}
+
+.icon-menu button {
+    min-height: 40px;
+    text-align: left;
+    padding: 0 10px;
+}
+
 /* ---------- Tablets and smaller: menu becomes a drawer ---------- */
 @media screen and (max-width: 1200px) {
     .search-toggle {
