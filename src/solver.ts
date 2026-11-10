@@ -70,9 +70,18 @@ function CreateLinkByAlgorithm(model:Model, algorithm:LinkAlgorithm, group:Recip
     delete collection[collectionKey];
     group.actualLinks[goodsId] = algorithm;
     model.constraints[linkName] = {equal:amount};
+    // Fixed crafter counts pin production rates, so producers and consumers of a
+    // linked item rarely match exactly. Let the excess leave the link as an
+    // output instead of making the whole model infeasible. The solver first
+    // minimises the total surplus, so it is only used when unavoidable.
+    if (hasFixedCrafters)
+        model.variables[`surplus_${group.iid}_${goodsId}`] = {[linkName]: 1, [SURPLUS_OBJECTIVE]: 1};
 }
 
 let solvingPage:PageModel | undefined;
+// Set while building the model when at least one recipe has a fixed crafter count.
+let hasFixedCrafters = false;
+const SURPLUS_OBJECTIVE = "surplus";
 
 function PreProcessRecipe(recipeModel:RecipeModel, model:Model, collection:LinkCollection)
 {
@@ -379,6 +388,13 @@ function ApplySolutionGroup(group:RecipeGroupModel, solution:Solution, model:Mod
     }
 }
 
+function HasFixedCrafters(group:RecipeGroupModel):boolean
+{
+    return group.elements.some(child => child instanceof RecipeGroupModel
+        ? HasFixedCrafters(child)
+        : (child as RecipeModel).fixedCrafterCount !== undefined && (child as RecipeModel).fixedCrafterCount !== 0);
+}
+
 export function SolvePage(page:PageModel):void
 {
     try {
@@ -400,10 +416,23 @@ export function SolvePage(page:PageModel):void
                 collection.output[product.goodsId] = {"_amount": product.amount};
             }
         }
+        hasFixedCrafters = HasFixedCrafters(page.rootGroup);
         CreateAndMatchLinks(page.rootGroup, model, collection);
         console.log("Solve model",model);
 
-        let solution = window.solver.Solve(model);
+        let solution:Solution;
+        if (hasFixedCrafters) {
+            // Phase 1: the smallest surplus that makes the model feasible.
+            const surplusSolution = window.solver.Solve({...model, optimize: SURPLUS_OBJECTIVE, opType: "min"});
+            if (surplusSolution.feasible) {
+                const minSurplus = Math.max(0, surplusSolution.result || 0);
+                // Phase 2: the usual objective, keeping the surplus at that minimum.
+                model.constraints[SURPLUS_OBJECTIVE] = {max: minSurplus * (1 + 1e-9) + 1e-9};
+            }
+            solution = window.solver.Solve(model);
+        } else {
+            solution = window.solver.Solve(model);
+        }
         console.log("Solve solution",solution);
         page.status = solution.feasible ? solution.bounded ? "solved" : "unbounded" : "infeasible";
         ApplySolutionGroup(page.rootGroup, solution, model, solution.feasible);

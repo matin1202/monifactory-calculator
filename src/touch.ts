@@ -6,7 +6,13 @@
 // To behave the same everywhere we detect the long press ourselves, dispatch a
 // synthetic "contextmenu" event, and swallow the browser's own one.
 
+import { IconBox, IsRecipeOutputIcon } from "./itemIcon.js";
+import { ShowTooltip } from "./tooltip.js";
+
 const LONG_PRESS_MS = 500;
+const DOUBLE_TAP_MS = 300;
+// Item icons in the recipe list: tap / double-tap search recipes, long-press shows the name.
+const RECIPE_IO_ICON = 'item-icon[data-action="item_icon_click"]';
 const MOVE_TOLERANCE_PX = 10;
 const LONG_PRESS_TARGETS = "item-icon";
 
@@ -47,6 +53,12 @@ document.addEventListener("touchstart", (e: TouchEvent) => {
             return;
         longPressFired = true;
         navigator.vibrate?.(15);
+        if (el.matches(RECIPE_IO_ICON) && el instanceof IconBox) {
+            const goods = el.GetDisplayObject();
+            if (goods)
+                ShowTooltip(el, { goods, action: el.getAttribute("data-amount") ? `Amount: ${el.getAttribute("data-amount")}` : null });
+            return;
+        }
         el.dispatchEvent(new MouseEvent("contextmenu", {
             bubbles: true,
             cancelable: true,
@@ -98,6 +110,49 @@ document.addEventListener("click", (e: MouseEvent) => {
         e.preventDefault();
         e.stopImmediatePropagation();
     }
+}, true);
+
+// Recipe list icons: one tap and a double tap search in opposite directions.
+//   ingredient: tap = recipes making it,  double tap = recipes using it
+//   result:     tap = recipes using it,   double tap = recipes making it
+// The recipe list maps "click" to production and "contextmenu" to consumption.
+let pendingTapTimer = 0;
+let pendingTapTarget: Element | null = null;
+
+function DispatchSearch(icon: Element, production: boolean) {
+    icon.dispatchEvent(new MouseEvent(production ? "click" : "contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        button: production ? 0 : 2,
+    }));
+}
+
+document.addEventListener("click", (e: MouseEvent) => {
+    // Our own re-dispatched events are untrusted; let them through.
+    if (!e.isTrusted || Date.now() - lastTouchTime > 1000)
+        return;
+    const icon = (e.target as Element | null)?.closest?.(RECIPE_IO_ICON);
+    if (!icon)
+        return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const isOutput = IsRecipeOutputIcon(icon);
+    if (pendingTapTimer && pendingTapTarget === icon) {
+        window.clearTimeout(pendingTapTimer);
+        pendingTapTimer = 0;
+        pendingTapTarget = null;
+        DispatchSearch(icon, isOutput);
+        return;
+    }
+    if (pendingTapTimer)
+        window.clearTimeout(pendingTapTimer);
+    pendingTapTarget = icon;
+    pendingTapTimer = window.setTimeout(() => {
+        pendingTapTimer = 0;
+        pendingTapTarget = null;
+        if (icon.isConnected)
+            DispatchSearch(icon, !isOutput);
+    }, DOUBLE_TAP_MS);
 }, true);
 
 export {};

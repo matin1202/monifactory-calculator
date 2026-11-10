@@ -169,7 +169,7 @@ export class RecipeList {
                                             min="0">
                                     </label>
                                 </div>
-                                <span class="text-small">When using a fixed crafter count, you should remove the product from the desired product list and let it be calculated automatically. Otherwise, the model will likely become infeasible.</span>
+                                <span class="text-small">With a fixed crafter count, anything the following recipes cannot use is sent to the output. The model is only infeasible when they need more than the fixed crafters can make.</span>
                             ` : ''}
                         </div>
                     `;
