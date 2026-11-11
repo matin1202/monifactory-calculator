@@ -3,3 +3,4 @@ node_modules/
 dist/
 export-data
 graphify-out/
+export_hard/

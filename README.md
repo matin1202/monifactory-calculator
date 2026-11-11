@@ -12,12 +12,28 @@ Targets Monifactory **0.13.8** (Minecraft 1.20.1, Forge, GTCEu 7.5.3).
 ```bash
 npm install
 npm start      # dev server on http://localhost:5500
-npm test       # builds with tsc, then runs jest against data/data.bin
+npm test       # builds with tsc, then runs jest against data/data.bin (and data/data-hard.bin if present)
 npm run build  # production build into dist/
 ```
 
 `data/data.bin` and `data/atlas.webp` are committed and generated from a Monifactory instance.
 See [export/README.md](export/README.md) for how to regenerate them.
+
+## Normal / Hard recipe modes
+
+The calculator can load either recipe set:
+
+| Mode   | Recipe data          | Icons                         |
+|--------|----------------------|-------------------------------|
+| Normal | `data/data.bin`      | `data/atlas.webp`             |
+| Hard   | `data/data-hard.bin` | `data/atlas-hard.webp`         |
+
+The mode is chosen with the "Recipes" select in the menu. It is resolved in this order:
+URL parameter `?mode=normal|hard`, then the `difficulty` value in localStorage, then Normal.
+Changing the select saves the choice, updates `?mode=` (a shared `#...` page link is kept) and reloads the page.
+Saved pages reference recipe ids, so a page made in one mode may show missing recipes in the other.
+
+If `data/data-hard.bin` is not present, Hard mode shows a loading error and its tests are skipped.
 
 ## Notes on machine modelling
 

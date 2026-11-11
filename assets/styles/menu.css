@@ -41,6 +41,12 @@
     justify-content: center;
 }
 
+.menu-difficulty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
 
 .page-list {
     display: flex;

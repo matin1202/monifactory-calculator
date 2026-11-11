@@ -1,6 +1,7 @@
 import { PageModel, serializer, SetCurrentPage, addProjectChangeListener, page, UpdateProject, ModelObjectValidator } from './page.js';
 import { showConfirmDialog } from './dialogues.js';
 import { ShowNei, ShowNeiMode } from "./nei.js";
+import { getDifficulty, setDifficulty } from "./difficulty.js";
 
 async function ValidateAndNotify(page: PageModel): Promise<void> {
     const validator = new ModelObjectValidator();
@@ -19,7 +20,7 @@ async function ValidateAndNotify(page: PageModel): Promise<void> {
             message += `\n- ${changed} changed recipe(s)`;
             message += `\nA changed recipe is a recipe that was changed a bit and might break, but uses and produces the same items as before. These recipes were replaced with the best matching recipes.\n`;
         }
-        message += `This is likely caused by the game version change.`;
+        message += `This is likely caused by the game version change, or by the page having been made in the other recipe mode (Normal/Hard).`;
 
         await showConfirmDialog(
             message,
@@ -89,6 +90,15 @@ export class PageManager {
             e.preventDefault();
             ShowNei(null, ShowNeiMode.Production, null);
         });
+
+        // Recipe data mode (Normal / Hard): switching reloads the page with the other data set
+        const difficultySelect = document.getElementById('difficulty') as HTMLSelectElement | null;
+        if (difficultySelect) {
+            difficultySelect.value = getDifficulty();
+            difficultySelect.addEventListener('change', () => {
+                setDifficulty(difficultySelect.value === "hard" ? "hard" : "normal");
+            });
+        }
 
         this.pageListContainer.addEventListener('blur', (e) => {
             const target = e.target as HTMLElement;
