@@ -63,7 +63,11 @@ jobs:
             echo "Error: data.bin is missing!"
             exit 1
           fi
-      
+          # Hard mode recipe data is optional until exported; the Hard option fails to load without it.
+          if [ ! -f dist/data/data-hard.bin ]; then
+            echo "::warning::data-hard.bin is missing; Hard mode will not load."
+          fi
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
       

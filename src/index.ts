@@ -1,14 +1,24 @@
+import { getDifficulty } from "./difficulty.js";
+
 const loading = document.getElementById("loading")!;
 try {
-    // Load the atlas image
+    // Load the atlas image (shared by both modes)
     const atlas = new Image();
     atlas.src = "./data/atlas.webp";
+
+    // Recipe data depends on the selected mode
+    const difficulty = getDifficulty();
+    const dataUrl = difficulty === "hard"
+        ? import.meta.resolve("./data/data-hard.bin")
+        : import.meta.resolve("./data/data.bin");
 
     // Load repository and data in parallel
     const [repositoryModule, response] = await Promise.all([
         import("./repository.js"),
-        fetch(import.meta.resolve("./data/data.bin"))
+        fetch(dataUrl)
     ]);
+    if (!response.ok)
+        throw new Error(`Failed to load ${difficulty} mode recipe data (${response.status} ${response.statusText})`);
     const stream = response.body!.pipeThrough(new DecompressionStream("gzip"));
     const buffer = await new Response(stream).arrayBuffer();
     repositoryModule.Repository.load(buffer);

@@ -1,7 +1,7 @@
 import { Repository, Item, Recipe } from '../repository';
 import { PageModel, RecipeModel } from '../page';
 import { SolvePage } from '../solver';
-import { setupRepository } from './setup';
+import { DataMode, hasData, setupRepository } from './setup';
 import { TIER_LUV } from '../utils';
 
 function solve(recipeId: string, crafter: string, voltageTier: number): RecipeModel {
@@ -23,9 +23,14 @@ function allRecipes(): Recipe[] {
     return Array.from(repo.recipes as Int32Array).map((ptr: number) => repo.GetObject(ptr, Recipe));
 }
 
-describe('Monifactory data', () => {
+// Hard mode data (data/data-hard.bin) is optional; its suite is skipped until the file exists.
+const modes: DataMode[] = hasData('hard') ? ['normal', 'hard'] : ['normal'];
+if (!hasData('hard'))
+    describe.skip('Monifactory data (hard): data/data-hard.bin missing', () => { it('skipped', () => {}); });
+
+describe.each(modes)('Monifactory data (%s)', (mode) => {
     beforeAll(async () => {
-        await setupRepository();
+        await setupRepository(mode);
     });
 
     it('loads GTCEu items and fluids with English names', () => {

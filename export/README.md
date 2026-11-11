@@ -36,6 +36,25 @@ Arguments:
 - `--skipIcons`: skip building the texture atlas
 - `--previous <path>`: previous `data.bin`, to keep old/obsolete recipes
 
+## Hard mode data
+
+Hard mode recipes are exported the same way from an instance switched to Hard mode. Process the
+export into a separate directory and keep only `data.bin`, renamed to `data/data-hard.bin`:
+
+```bash
+dotnet run --project export/export.csproj -c Release -- "<path to Hard local/export>" --output hard-out
+mv hard-out/data.bin data/data-hard.bin
+```
+
+Notes:
+- Both files must be written by the same exporter version (`DATA_VERSION` in `src/repository.ts`).
+- The app uses `data/atlas.webp` for both modes. An item's `iconId` is its index among all fluids
+  followed by the items the recipes touch (`ExportDataConverter.cs`), so the shared atlas is only
+  correct if the Hard export produces the same icon list. Check that `hard-out/atlas.webp` is
+  identical to `data/atlas.webp`; if it is not, ship it as `data/atlas-hard.webp` and select it in
+  `src/index.ts` the same way as the data file.
+- `--previous` should point at the previous file of the same mode (`data/data-hard.bin` for Hard).
+
 ## Sanity checks
 
 `npm test` includes a smoke test that solves a sample recipe on every multiblock with modifiers
