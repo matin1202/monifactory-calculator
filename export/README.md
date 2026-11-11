@@ -48,11 +48,9 @@ mv hard-out/data.bin data/data-hard.bin
 
 Notes:
 - Both files must be written by the same exporter version (`DATA_VERSION` in `src/repository.ts`).
-- The app uses `data/atlas.webp` for both modes. An item's `iconId` is its index among all fluids
-  followed by the items the recipes touch (`ExportDataConverter.cs`), so the shared atlas is only
-  correct if the Hard export produces the same icon list. Check that `hard-out/atlas.webp` is
-  identical to `data/atlas.webp`; if it is not, ship it as `data/atlas-hard.webp` and select it in
-  `src/index.ts` the same way as the data file.
+- Each mode has its own atlas: `data/atlas.webp` (Normal) and `data/atlas-hard.webp` (Hard), because an item's
+  `iconId` is its index among all fluids followed by the items the recipes touch (`ExportDataConverter.cs`),
+  which differs between exports. Rename the Hard `atlas.webp` output to `atlas-hard.webp`; `src/index.ts` selects it.
 - `--previous` should point at the previous file of the same mode (`data/data-hard.bin` for Hard).
 
 ## Sanity checks

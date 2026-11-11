@@ -2,12 +2,16 @@ import { getDifficulty } from "./difficulty.js";
 
 const loading = document.getElementById("loading")!;
 try {
-    // Load the atlas image (shared by both modes)
-    const atlas = new Image();
-    atlas.src = "./data/atlas.webp";
-
-    // Recipe data depends on the selected mode
+    // Recipe data and the icon atlas depend on the selected mode (icon indices differ per export)
     const difficulty = getDifficulty();
+    const atlasPath = difficulty === "hard" ? "data/atlas-hard.webp" : "data/atlas.webp";
+    if (difficulty === "hard") {
+        // The stylesheet resolves relative to assets/styles/, so use an absolute URL
+        document.documentElement.style.setProperty("--atlas-url", `url('${new URL("./" + atlasPath, document.baseURI).href}')`);
+    }
+    const atlas = new Image();
+    atlas.src = "./" + atlasPath;
+
     const dataUrl = difficulty === "hard"
         ? import.meta.resolve("./data/data-hard.bin")
         : import.meta.resolve("./data/data.bin");

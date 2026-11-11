@@ -26,7 +26,7 @@ The calculator can load either recipe set:
 | Mode   | Recipe data          | Icons                         |
 |--------|----------------------|-------------------------------|
 | Normal | `data/data.bin`      | `data/atlas.webp`             |
-| Hard   | `data/data-hard.bin` | `data/atlas.webp` (shared)    |
+| Hard   | `data/data-hard.bin` | `data/atlas-hard.webp`         |
 
 The mode is chosen with the "Recipes" select in the menu. It is resolved in this order:
 URL parameter `?mode=normal|hard`, then the `difficulty` value in localStorage, then Normal.
