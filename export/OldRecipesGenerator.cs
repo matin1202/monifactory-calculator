@@ -98,7 +98,8 @@ public class OldRecipesGenerator
             var recipeTypeName = Encoding.UTF8.GetBytes(ReadString(dataBin, intBuffer, recipeTypePtr));
             hash1.AppendData(recipeTypeName);
             hash2.AppendData(recipeTypeName);
-            for (var i = 0; i < recipeIoList.Length; i+=5)
+            var stride = dataVersion >= 7 ? 6 : 5;
+            for (var i = 0; i < recipeIoList.Length; i += stride)
             {
                 var type = recipeIoList[i];
                 var goods = recipeIoList[i + 1];
@@ -132,7 +133,7 @@ public class OldRecipesGenerator
             var oldRemap = ReadSlice(intBuffer, 7);
             foreach (var remap in oldRemap)
             {
-                var idFrom = ReadString(dataBin, intBuffer, intBuffer[remap]);
+                var idFrom = ReadString(dataBin, intBuffer, remap);
                 var idTo = ReadString(dataBin, intBuffer, intBuffer[remap+1] + 4);
 
                 var recipeTo = recipesById.GetValueOrDefault(idTo) ?? remappedRecipes.GetValueOrDefault(idTo);
