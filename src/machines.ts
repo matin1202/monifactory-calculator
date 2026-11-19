@@ -229,16 +229,21 @@ export const notImplementedMachine:Machine = {
 // overclock, no parallels) and carry an informational note.
 // ============================================================================
 
-function makeParallelHatchChoice(tiers:ParallelHatchTier[]):Choice {
-    return {
-        description: "Parallel Hatch",
-        choices: tiers.map((tier) => `${tier.name}: ${tier.parallels}`),
-    };
+// Option labels for a parallel hatch choice. Index 0 is "None" (no hatch
+// installed, 1 parallel); index i > 0 selects tiers[i - 1].
+function parallelHatchOptions(tiers:ParallelHatchTier[]):string[] {
+    return ["None: 1", ...tiers.map((tier) => `${tier.name}: ${tier.parallels}`)];
 }
 
-// Number of parallels for the selected hatch (choice index into the tier list).
+function makeParallelHatchChoice(description:string, tiers:ParallelHatchTier[]):Choice {
+    return { description, choices: parallelHatchOptions(tiers) };
+}
+
+// Number of parallels for the selected hatch (0 = no hatch).
 function parallelHatchCount(tiers:ParallelHatchTier[], index:number):number {
-    const tier = tiers[index] ?? tiers[0];
+    if (!index || index <= 0)
+        return 1;
+    const tier = tiers[index - 1] ?? tiers[tiers.length - 1];
     return Math.max(1, tier?.parallels ?? 1);
 }
 
@@ -275,8 +280,8 @@ export type ChoiceDescriptor = {
 export function getChoiceDefaultDescriptors():ChoiceDescriptor[] {
     return [
         { key: "coilTier", description: "Coils", options: CoilTierNames.map((name, index) => `T${index+1}: ${name}`) },
-        { key: "parallels", description: "Parallel Hatch", options: ParallelHatchTiers.map((tier) => `${tier.name}: ${tier.parallels}`) },
-        { key: "absoluteParallels", description: "Absolute Parallel Hatch", options: AbsoluteParallelHatchTiers.map((tier) => `${tier.name}: ${tier.parallels}`) },
+        { key: "parallelHatch", description: "Parallel Hatch", options: parallelHatchOptions(ParallelHatchTiers) },
+        { key: "absoluteParallelHatch", description: "Absolute Parallel Hatch", options: parallelHatchOptions(AbsoluteParallelHatchTiers) },
         { key: "bulking", description: "Bulking", options: BULKING_TYPES.map((type, i) => `Type ${i}: ${type.parallels}x / ${type.durationMultiplier}x`) },
         { key: "rotorHolder", description: "Rotor Holder", options: RotorHolderTiers.map((holder) => holder.name) },
         { key: "turbineRotor", description: "Rotor", options: TurbineRotors.map((rotor) => `${rotor.name} (P:${rotor.power}%, E:${rotor.efficiency}%)`) },
@@ -378,8 +383,8 @@ function addCoilChoice(builder:MachineBuilder) {
     builder.choices["coilTier"] = makeCoilChoice();
 }
 function addParallelChoice(builder:MachineBuilder) {
-    builder.choices["parallels"] = makeParallelHatchChoice(ParallelHatchTiers);
-    builder.parallelFactors.push((_recipe, choices) => parallelHatchCount(ParallelHatchTiers, choices.parallels));
+    builder.choices["parallelHatch"] = makeParallelHatchChoice("Parallel Hatch", ParallelHatchTiers);
+    builder.parallelFactors.push((_recipe, choices) => parallelHatchCount(ParallelHatchTiers, choices.parallelHatch));
 }
 
 function addBulkingChoice(builder:MachineBuilder) {
@@ -393,9 +398,9 @@ function addBulkingChoice(builder:MachineBuilder) {
 // Like addParallelChoice, but the parallels do not increase the EU consumed:
 // each parallel runs for free, so the per-recipe power is divided by the count.
 function addFreeParallelChoice(builder:MachineBuilder) {
-    builder.choices["absoluteParallels"] = makeParallelHatchChoice(AbsoluteParallelHatchTiers);
-    builder.parallelFactors.push((_recipe, choices) => parallelHatchCount(AbsoluteParallelHatchTiers, choices.absoluteParallels));
-    builder.powerFactors.push((_recipe, choices) => 1 / parallelHatchCount(AbsoluteParallelHatchTiers, choices.absoluteParallels));
+    builder.choices["absoluteParallelHatch"] = makeParallelHatchChoice("Absolute Parallel Hatch", AbsoluteParallelHatchTiers);
+    builder.parallelFactors.push((_recipe, choices) => parallelHatchCount(AbsoluteParallelHatchTiers, choices.absoluteParallelHatch));
+    builder.powerFactors.push((_recipe, choices) => 1 / parallelHatchCount(AbsoluteParallelHatchTiers, choices.absoluteParallelHatch));
 }
 
 // Crafters whose recipe-modifier lambda is not modelled by id but whose behaviour
