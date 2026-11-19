@@ -37,6 +37,8 @@ export class PageManager {
     private pageListContainer: HTMLElement;
     private pageCache: Map<string, PageModel> = new Map();
     private undoInProgress: boolean = false;
+    private brokenPages: Set<string> = new Set();
+    private creatingFallbackPage: boolean = false;
 
     constructor() {
         this.pageListContainer = document.querySelector('.page-list')!;
@@ -169,7 +171,9 @@ export class PageManager {
             } else {
                 const button = document.createElement('button');
                 button.className = 'page-button';
-                button.textContent = pageName;
+                button.textContent = this.brokenPages.has(pageName) ? `⚠ ${pageName}` : pageName;
+                if (this.brokenPages.has(pageName))
+                    button.title = "This page failed to load. Click to retry.";
                 button.setAttribute('data-action', 'switch-page');
                 button.setAttribute('data-page-name', pageName);
 
@@ -191,29 +195,83 @@ export class PageManager {
         
         this.currentPage = pageName;
         
-        // Try to get page from cache first
-        let page = this.pageCache.get(pageName);
-        
-        if (!page) {
-            // If not in cache, load from localStorage
-            const stored = localStorage.getItem(`p:${pageName}`);
-            if (stored) {
-                page = new PageModel(JSON.parse(stored));
-                ValidateAndNotify(page);
-                page.name = pageName;
-                this.pageCache.set(pageName, page);
-                // Initialize history with the loaded state
-                page.addToHistory(stored);
+        try {
+            // Try to get page from cache first
+            let page = this.pageCache.get(pageName);
+            
+            if (!page) {
+                // If not in cache, load from localStorage
+                const stored = localStorage.getItem(`p:${pageName}`);
+                if (stored) {
+                    page = new PageModel(JSON.parse(stored));
+                    ValidateAndNotify(page);
+                    page.name = pageName;
+                    this.pageCache.set(pageName, page);
+                    // Initialize history with the loaded state
+                    page.addToHistory(stored);
+                }
             }
-        }
-        
-        if (page) {
-            SetCurrentPage(page);
-            // Update window title
-            document.title = `${page.name} - Monifactory calculator`;
+            
+            if (page) {
+                SetCurrentPage(page);
+                this.brokenPages.delete(pageName);
+                // Update window title
+                document.title = `${page.name} - Monifactory calculator`;
+            }
+        } catch (error) {
+            this.handleBrokenPage(pageName, error);
+            return;
         }
         
         this.render();
+    }
+
+    // A stored page failed to load (e.g. saved by an older version or in the
+    // other recipe mode). Fall back to a page that works so the app stays
+    // usable, then offer to delete the broken one.
+    private handleBrokenPage(pageName: string, error: unknown) {
+        console.error(`Failed to load page "${pageName}":`, error);
+        this.pageCache.delete(pageName);
+        this.brokenPages.add(pageName);
+        this.currentPage = null;
+
+        const fallback = this.pages.find(name => !this.brokenPages.has(name));
+        if (fallback !== undefined) {
+            this.switchPage(fallback);
+        } else if (!this.creatingFallbackPage) {
+            this.creatingFallbackPage = true;
+            try {
+                this.createNewPage('New');
+            } finally {
+                this.creatingFallbackPage = false;
+            }
+        } else {
+            // Even an empty page fails to load: nothing to fall back to.
+            throw error;
+        }
+        this.render();
+
+        const message = error instanceof Error ? error.message : String(error);
+        showConfirmDialog(
+            `Page "${pageName}" could not be loaded:\n${message}\n\n` +
+            `It may have been made with an older version of the calculator or in the other recipe mode (Normal/Hard). ` +
+            `Do you want to delete it? This action cannot be undone.`,
+            `Delete ${pageName}`,
+            null,
+            `Keep`
+        ).then(action => {
+            if (action === "option1")
+                this.removePage(pageName);
+        });
+    }
+
+    private removePage(pageName: string) {
+        localStorage.removeItem(`p:${pageName}`);
+        this.pageCache.delete(pageName);
+        this.brokenPages.delete(pageName);
+        const index = this.pages.indexOf(pageName);
+        if (index !== -1)
+            this.pages.splice(index, 1);
     }
 
     private createNewPage(pageName: string) {
@@ -412,15 +470,7 @@ export class PageManager {
             `Cancel`
         ).then(action => {
             if (action === "option1") {
-                // Remove from storage
-                localStorage.removeItem(`p:${pageName}`);
-                // Remove from cache
-                this.pageCache.delete(pageName);
-                // Remove from pages list
-                const index = this.pages.indexOf(pageName);
-                if (index !== -1) {
-                    this.pages.splice(index, 1);
-                }
+                this.removePage(pageName);
                 // Switch to first page or create new one
                 if (this.pages.length > 0) {
                     this.switchPage(this.pages[0]);
