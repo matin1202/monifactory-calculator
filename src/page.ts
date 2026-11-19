@@ -263,7 +263,7 @@ export class RecipeModel extends RecipeGroupEntry
             if (typeof source.crafter === "string")
                 this.crafter = source.crafter;
             if (source.choices instanceof Object)
-                this.userChoices = source.choices;
+                this.userChoices = MigrateParallelHatchChoices(source.choices);
             if (typeof source.fixedCrafterCount === "number")
                 this.fixedCrafterCount = source.fixedCrafterCount;
         }
@@ -339,6 +339,27 @@ export class ProductModel extends ModelObject
     }
 }
 
+// Older saves stored parallel hatch choices under "parallels" /
+// "absoluteParallels" with index 0 = the lowest hatch tier. The current keys
+// insert "None" at index 0, so the old indices shift up by one.
+const LEGACY_PARALLEL_CHOICE_KEYS:{[legacy:string]:string} = {
+    parallels: "parallelHatch",
+    absoluteParallels: "absoluteParallelHatch",
+};
+
+function MigrateParallelHatchChoices(choices:{[key:string]:number}):{[key:string]:number} {
+    const migrated = {...choices};
+    for (const [legacy, current] of Object.entries(LEGACY_PARALLEL_CHOICE_KEYS)) {
+        if (!(legacy in migrated))
+            continue;
+        const value = migrated[legacy];
+        delete migrated[legacy];
+        if (typeof value === "number" && !(current in migrated))
+            migrated[current] = value + 1;
+    }
+    return migrated;
+}
+
 type Settings = {
     minVoltage: number;
     timeUnit: "hour" | "min" | "sec" | "tick";
@@ -386,7 +407,7 @@ export class PageModel extends ModelObject
                 if (source.settings.defaultCrafters instanceof Object)
                     this.settings.defaultCrafters = source.settings.defaultCrafters;
                 if (source.settings.defaultChoices instanceof Object)
-                    this.settings.defaultChoices = source.settings.defaultChoices;
+                    this.settings.defaultChoices = MigrateParallelHatchChoices(source.settings.defaultChoices);
             }
         }
     }
